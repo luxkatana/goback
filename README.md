@@ -15,5 +15,6 @@ Voorlopig wil ik het zo maken dat mensen er gebruik van kan maken en dat je het 
 - Beautifulsoup, een python module om html te parsen en er iets mee te doen
 - ChatGPT voor frontend development assistentie
 - GitHub voor versioning
-
+- Neovim (want vim on top)
+- Github codespaces
 
