@@ -17,5 +17,3 @@ Voorlopig wil ik het zo maken dat mensen er gebruik van kan maken en dat je het 
 - GitHub voor versioning
 
 
-**Test commit om te kijken als ik NIET kan pushen naar de master branch**
-
