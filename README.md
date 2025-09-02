@@ -10,7 +10,12 @@ Voorlopig wil ik het zo maken dat mensen er gebruik van kan maken en dat je het 
 
 ## Tools dat ik ga gebruiken
 
-- Een linux vm/vps (arch of debian based) 
+- Een linux vm/vps (debian based) voor hosting
 - Flask: Een webserver om frontend te serveren aan mensen
 - Beautifulsoup, een python module om html te parsen en er iets mee te doen
-- 
+- Chatgpt evt voor frontend (mijn frontend skills zijn zo slecht, ik vergeet altijd dat html een ding is)
+- GitHub voor versioning
+
+
+**Test commit om te kijken als ik NIET kan pushen naar de master branch**
+
