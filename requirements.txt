@@ -1,0 +1,4 @@
+Flask
+async-appwrite
+beautifulsoup4
+python-dotenv

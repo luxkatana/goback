@@ -1,20 +1,13 @@
 # goback - Betere versie van wayback
 
+## What is this project?
 
-## Wat het project wordt
-
-Het project wordt een applicatie die een kopie maakt van een bepaalde website.  
-
-Voorlopig wil ik het zo maken dat mensen er gebruik van kan maken en dat je het online kunt zien de backup.
+This project will be a copy of the wayback machine, but more simpler and basic.
 
 
-## Tools dat ik ga gebruiken
 
-- Een linux vm/vps (debian based) voor hosting
-- Flask: Een webserver om frontend te serveren aan mensen
-- Beautifulsoup, een python module om html te parsen en er iets mee te doen
-- ChatGPT voor frontend development assistentie
-- GitHub voor versioning
-- Neovim (want vim on top)
-- Github codespaces
+## Requirements to run this project
+
+- Python3
+- An appwrite server + an API key (https://appwrite.io/)
 
