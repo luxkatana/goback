@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template, Response, Request
 from dotenv import load_dotenv
 from os import getenv
 
@@ -6,6 +6,21 @@ load_dotenv()
 
 
 app = Flask(__name__)
+
+
+@app.route("/login")
+async def login() -> Response:
+    return render_template("login.html")
+
+
+@app.route("/signup")
+async def signup() -> Response:
+    return render_template("signup.html")
+
+
+@app.get("/")
+async def index() -> Response:
+    return render_template("index.html")
 
 
 if __name__ == "__main__":
