@@ -20,16 +20,21 @@ class OurbackScraper:
         """
 
         response = await self.httpx_client.get(self.url)
-        # response.raise_for_status() For now ignore this
+        response.raise_for_status()
         html_content = response.content.decode()
-        self.main_html_content = BeautifulSoup(html_content)
+        self.main_html_content = BeautifulSoup(html_content, "lxml")
+
+    async def walk_through(self) -> None:
+        pass
 
 
 async def main(url: str) -> None:
     scraper = OurbackScraper(url)
     await scraper.load_html()
+    print(scraper.main_html_content)
 
 
 if __name__ == "__main__":  # Directly ran using the python3 interpreter
     url = input("Enter url to retrieve (live mode or something): ")
+    url = "https://guthib.com" if url == "" else url
     asyncio.run(main(url))
