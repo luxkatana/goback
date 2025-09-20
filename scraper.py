@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import asyncio
 
 
-class OurbackScraper:
+class GobackScraper:
     def __init__(self, url: str):
         self.url = url
         self.httpx_client: httpx.AsyncClient = httpx.AsyncClient(
@@ -29,7 +29,7 @@ class OurbackScraper:
 
 
 async def main(url: str) -> None:
-    scraper = OurbackScraper(url)
+    scraper = GobackScraper(url)
     await scraper.load_html()
     print(scraper.main_html_content)
 
