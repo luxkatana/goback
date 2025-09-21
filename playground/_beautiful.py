@@ -3,7 +3,7 @@ import bs4
 from bs4.element import PageElement
 
 
-URL_TAGS = frozenset(("href", "rel"))
+URL_TAGS = frozenset(("href", "src"))
 with open("./_index.html", "r") as file:
     soup = BeautifulSoup(file.read(), "lxml")
 
@@ -29,8 +29,6 @@ def traverse_through_tree(elements: list[PageElement]):
                     element.attrs
                 ):  # If it isnt empty
                     print(useful_attrs)
-
-                    print(get_useful_attributes(element.attrs))
 
                 traverse_through_tree(element.children)
             case bs4.element.NavigableString:

@@ -1,6 +1,11 @@
-import httpx
+from warnings import deprecated
+from bs4.element import PageElement
 from bs4 import BeautifulSoup
-import asyncio
+import httpx
+import re
+import asyncio, bs4
+
+URL_TAGS = frozenset(("href", "src"))
 
 
 class GobackScraper:
@@ -21,20 +26,77 @@ class GobackScraper:
 
         response = await self.httpx_client.get(self.url)
         response.raise_for_status()
-        html_content = response.content.decode()
-        self.main_html_content = BeautifulSoup(html_content, "lxml")
+        self.main_html_content = BeautifulSoup(response.text, "lxml")
 
-    async def walk_through(self) -> None:
-        pass
+    @staticmethod
+    def get_useful_attributes(
+        attributes: dict[str, str],
+    ) -> dict[str, str] | None:
+        keys = dict()
+        for url_tag in URL_TAGS:
+            if (
+                corresponding_value := attributes.get(url_tag, None)
+            ) is not None:  # Exists there
+                keys[url_tag] = corresponding_value
+        return keys
+
+    def is_link_tag(tag: bs4.element.Tag) -> bool:
+        return GobackScraper.get_useful_attributes(tag.attrs) != {}
+
+    async def walk_through_native(
+        self,
+    ) -> list[tuple[dict[str, str], PageElement]] | list[None]:
+
+        return list(
+            map(
+                lambda element: (GobackScraper.get_useful_attributes(element), element),
+                self.main_html_content.find_all(GobackScraper.is_link_tag),
+            )
+        )
+
+    @deprecated("This may be useful in the future, in case we need more complexity")
+    async def walk_through(
+        self, elements: list[PageElement]
+    ) -> list[PageElement] | None:
+        useful_elements = []
+        for element in elements:
+            match type(element):
+
+                case bs4.element.Tag:
+                    element: bs4.element.Tag
+                    print("This is a tag =>", element.name)
+                    if useful_attrs := self.get_useful_attributes(
+                        element.attrs
+                    ):  # If it isnt empty
+                        useful_elements.append(element)
+                        print(useful_attrs)
+
+                    useful_elements.extend(await self.walk_through(element.children))
+
+                case bs4.element.NavigableString:
+                    if element != "\n":
+                        print("This is a string =>", str(element.string))
+        return useful_elements
 
 
 async def main(url: str) -> None:
     scraper = GobackScraper(url)
     await scraper.load_html()
-    print(scraper.main_html_content)
+    useful_element = await scraper.walk_through_native()
+    if len(useful_element) == 0:
+        print("Nothing to save")
+        exit(0)
+
+    regex_valid_urls = re.compile(
+        r"^(?:\/[\w\-./%~]+|(?:\.\.\/|\./)?[\w\-./%~]+|\?[^\s]+)$"
+    )
+    for attributes, element in useful_element:
+        pass
 
 
-if __name__ == "__main__":  # Directly ran using the python3 interpreter
+if (
+    __name__ == "__main__"
+):  # Directly ran using the python3 interpreter, prevents accidental runs by importing this module
     url = input("Enter url to retrieve (live mode or something): ")
-    url = "https://guthib.com" if url == "" else url
+    url = "http://127.0.0.1:8000/" if url == "" else url  # Test url
     asyncio.run(main(url))
