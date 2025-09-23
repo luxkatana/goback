@@ -1,4 +1,3 @@
-from warnings import deprecated
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
 import httpx
@@ -54,7 +53,7 @@ class GobackScraper:
             )
         )
 
-    @deprecated("This may be useful in the future, in case we need more complexity")
+    # This may be useful in the future, in case we need more complexity
     async def walk_through(
         self, elements: list[PageElement]
     ) -> list[PageElement] | None:
@@ -91,7 +90,9 @@ async def main(url: str) -> None:
         r"^(?:\/[\w\-./%~]+|(?:\.\.\/|\./)?[\w\-./%~]+|\?[^\s]+)$"
     )
     for attributes, element in useful_element:
-        pass
+        for (key, value) in attributes.items():
+            if re.fullmatch(regex_valid_urls, value) is not None:
+                pass
 
 
 if (
