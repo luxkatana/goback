@@ -1,10 +1,12 @@
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
-import httpx
-import re
-import asyncio, bs4
+from urllib.parse import urlparse
+from dotenv import load_dotenv
+import asyncio, bs4, httpx, re, os
 
+load_dotenv()
 URL_TAGS = frozenset(("href", "src"))
+APPWRITE_KEY = os.getenv("APPWRITE_KEY")
 
 
 class GobackScraper:
@@ -76,7 +78,10 @@ class GobackScraper:
                     if element != "\n":
                         print("This is a string =>", str(element.string))
         return useful_elements
-
+    
+    async def request_html_of_link(self, url: str) -> httpx.Response:
+        response = await self.httpx_client.get(url)
+        return response.raise_for_status()
 
 async def main(url: str) -> None:
     scraper = GobackScraper(url)
@@ -92,12 +97,19 @@ async def main(url: str) -> None:
     for attributes, element in useful_element:
         for (key, value) in attributes.items():
             if re.fullmatch(regex_valid_urls, value) is not None:
-                pass
+                if value.startswith("/"): # Path 
+                    url_obj = urlparse(url)
+                    url_obj = url_obj._replace(query=None, path=value)
+                    element_response = await scraper.request_html_of_link(url_obj.geturl())
+                    print(element_response.text)
+                    pass
+
+                
 
 
 if (
     __name__ == "__main__"
-):  # Directly ran using the python3 interpreter, prevents accidental runs by importing this module
+):  # Directly ran using the python3 interpreter, prevents accidental runs for example as importing this module
     url = input("Enter url to retrieve (live mode or something): ")
-    url = "http://127.0.0.1:8000/" if url == "" else url  # Test url
+    url = "https://cooletaseen.hondsrugcollege.com/" if url == "" else url  # Test url
     asyncio.run(main(url))
