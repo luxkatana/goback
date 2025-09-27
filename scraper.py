@@ -120,5 +120,9 @@ if (
     __name__ == "__main__"
 ):  # Directly ran using the python3 interpreter, prevents accidental runs for example as importing this module
     url = input("Enter url to retrieve (live mode or something): ")
-    url = "https://cooletaseen.hondsrugcollege.com/" if url == "" else url  # Test url
+    url = (
+        "https://cooletaseen.hondsrugcollege.com/basic_document.html"
+        if url == ""
+        else url
+    )  # Test url
     asyncio.run(main(url))
