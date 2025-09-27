@@ -1,11 +1,14 @@
-from flask import Flask, render_template, Response, Request
+from flask import Flask, render_template, Response, Request, send_file
 from dotenv import load_dotenv
 from os import getenv
+from io import BytesIO
+from appwrite_session import AppwriteSession
 
 load_dotenv()
 
 
 app = Flask(__name__)
+appwritesession = AppwriteSession()
 
 
 @app.route("/login")
@@ -16,6 +19,14 @@ async def login() -> Response:
 @app.route("/signup")
 async def signup() -> Response:
     return render_template("signup.html")
+
+
+@app.get("/media/<string:file_id>")
+async def get_media(file_id: str):
+    if len(file_id) != 32:
+        return "Invalid file id"
+    file_fetch_response = await appwritesession.get_file(file_id)
+    return file_fetch_response
 
 
 @app.get("/")

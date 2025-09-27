@@ -1,5 +1,6 @@
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
+from appwrite_session import AppwriteSession, create_file_identifier
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 import asyncio, bs4, httpx, re, os
@@ -7,6 +8,7 @@ import asyncio, bs4, httpx, re, os
 load_dotenv()
 URL_TAGS = frozenset(("href", "src"))
 APPWRITE_KEY = os.getenv("APPWRITE_KEY")
+HOST_WEBSERVER_URL = "http://localhost:8000"
 
 
 class GobackScraper:
@@ -70,7 +72,6 @@ class GobackScraper:
                         element.attrs
                     ):  # If it isnt empty
                         useful_elements.append(element)
-                        print(useful_attrs)
 
                     useful_elements.extend(await self.walk_through(element.children))
 
@@ -78,10 +79,11 @@ class GobackScraper:
                     if element != "\n":
                         print("This is a string =>", str(element.string))
         return useful_elements
-    
+
     async def request_html_of_link(self, url: str) -> httpx.Response:
         response = await self.httpx_client.get(url)
         return response.raise_for_status()
+
 
 async def main(url: str) -> None:
     scraper = GobackScraper(url)
@@ -94,17 +96,24 @@ async def main(url: str) -> None:
     regex_valid_urls = re.compile(
         r"^(?:\/[\w\-./%~]+|(?:\.\.\/|\./)?[\w\-./%~]+|\?[^\s]+)$"
     )
+    session = AppwriteSession()
     for attributes, element in useful_element:
-        for (key, value) in attributes.items():
+        for key, value in attributes.items():
             if re.fullmatch(regex_valid_urls, value) is not None:
-                if value.startswith("/"): # Path 
-                    url_obj = urlparse(url)
-                    url_obj = url_obj._replace(query=None, path=value)
-                    element_response = await scraper.request_html_of_link(url_obj.geturl())
-                    print(element_response.text)
-                    pass
-
-                
+                if value.startswith("/"):  # Path
+                    url_obj = urlparse(url)._replace(query=None, path=value)
+                    element_response = await scraper.request_html_of_link(
+                        url_obj.geturl()
+                    )
+                    unique_identifier = create_file_identifier(
+                        element_response.text, url_obj.hostname
+                    )
+                    savedfile = await session.appwrite_publish_media(
+                        unique_identifier, element_response.text
+                    )
+                    element.attrs[key] = (
+                        f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
+                    )
 
 
 if (
