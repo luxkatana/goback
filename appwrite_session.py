@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from typing import Any
 from os import environ
 from appwrite.client import Client
 from hashlib import md5, sha256
@@ -55,5 +56,10 @@ class AppwriteSession:
 
         return SavedFile(file_identifier, md5_file_id)
 
-    async def get_file(self, appwrite_file_id: str):
-        return self.storage.get_file(APPWRITE_STORAGE_BUCKET_ID, appwrite_file_id)
+    async def get_file_metadata(self, appwrite_file_id: str) -> dict[str, Any]:
+        metadata = self.storage.get_file(APPWRITE_STORAGE_BUCKET_ID, appwrite_file_id)
+        return metadata
+    
+    async def get_file_content(self, appwrite_file_id: str) -> bytes:
+        return self.storage.get_file_download(APPWRITE_STORAGE_BUCKET_ID, appwrite_file_id)
+    
