@@ -1,4 +1,4 @@
-Flask
+Flask[async]
 async-appwrite
 beautifulsoup4
 python-dotenv

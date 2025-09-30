@@ -8,7 +8,7 @@ import asyncio, bs4, httpx, re, os
 load_dotenv()
 URL_TAGS = frozenset(("href", "src"))
 APPWRITE_KEY = os.getenv("APPWRITE_KEY")
-HOST_WEBSERVER_URL = "http://localhost:8000"
+HOST_WEBSERVER_URL = "https://upgraded-space-invention-5rx6w7q5j74fp6r5-5000.app.github.dev"
 
 
 class GobackScraper:
@@ -114,6 +114,7 @@ async def main(url: str) -> None:
                     element.attrs[key] = (
                         f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
                     )
+    print(scraper.main_html_content)
 
 
 if (
