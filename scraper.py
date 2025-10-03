@@ -1,6 +1,6 @@
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
-from appwrite_session import AppwriteSession, create_file_identifier
+from appwrite_session import AppwriteSession, create_file_identifier, insert_site_row
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 import asyncio, bs4, httpx, re, os
@@ -8,7 +8,8 @@ import asyncio, bs4, httpx, re, os
 load_dotenv()
 URL_TAGS = frozenset(("href", "src"))
 APPWRITE_KEY = os.getenv("APPWRITE_KEY")
-HOST_WEBSERVER_URL = "https://upgraded-space-invention-5rx6w7q5j74fp6r5-5000.app.github.dev"
+HOST_WEBSERVER_URL = os.getenv("GOBACK_MEDIA_URL")
+#   "https://upgraded-space-invention-5rx6w7q5j74fp6r5-5000.app.github.dev"
 
 
 class GobackScraper:
@@ -114,7 +115,15 @@ async def main(url: str) -> None:
                     element.attrs[key] = (
                         f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
                     )
-    print(scraper.main_html_content)
+    site_document_indentifier = create_file_identifier(
+        str(scraper.main_html_content), url
+    )
+    print(site_document_indentifier)
+    await session.appwrite_publish_media(
+        site_document_indentifier, str(scraper.main_html_content)
+    )
+    print(str(scraper.main_html_content))
+    await insert_site_row(url, site_document_indentifier)
 
 
 if (

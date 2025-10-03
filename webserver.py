@@ -23,7 +23,7 @@ async def signup() -> Response:
 
 @app.get("/media/<string:file_id>")
 async def get_media(file_id: str):
-    if len(file_id) != 32: # Is een md5 hash, en die heeft altijd 32 karakters
+    if len(file_id) != 32:  # Is een md5 hash, en die heeft altijd 32 karakters
         return "Invalid file id"
     file_fetch_response = await appwritesession.get_file_content(file_id)
     return file_fetch_response

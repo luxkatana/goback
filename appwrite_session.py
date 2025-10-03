@@ -5,12 +5,31 @@ from appwrite.client import Client
 from hashlib import md5, sha256
 from appwrite.services.storage import Storage
 from appwrite.input_file import InputFile
+import aiomysql
 
 load_dotenv()
 APPWRITE_API_KEY = environ["APPWRITE_KEY"]
 APPWRITE_ENDPOINT = environ["APPWRITE_ENDPOINT"]
 APPWRITE_PROJECT_ID = environ["APPWRITE_PROJECT_ID"]
 APPWRITE_STORAGE_BUCKET_ID = environ["APPWRITE_STORAGE_BUCKET_ID"]
+MYSQL_HOST = environ["MYSQL_HOST"]
+MYSQL_USER = environ["MYSQL_USER"]
+MYSQL_PASS = environ["MYSQL_PASSWORD"]
+MYSQL_DB = environ["MYSQL_DB"]
+
+
+async def insert_site_row(site_url: str, document_filehash: str):
+    async with aiomysql.connect(
+        MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DB
+    ) as connection:
+        async with connection.cursor() as cursor:
+            cursor: aiomysql.Cursor
+            cursor.execute(
+                "INSERT INTO goback_sites_metadata (site_url, document_filehash) VALUES (?, ?)",
+                (site_url, document_filehash),
+            )
+
+        connection.commit()
 
 
 def create_file_identifier(file_content: str, host_url: str) -> str:
@@ -59,7 +78,8 @@ class AppwriteSession:
     async def get_file_metadata(self, appwrite_file_id: str) -> dict[str, Any]:
         metadata = self.storage.get_file(APPWRITE_STORAGE_BUCKET_ID, appwrite_file_id)
         return metadata
-    
+
     async def get_file_content(self, appwrite_file_id: str) -> bytes:
-        return self.storage.get_file_download(APPWRITE_STORAGE_BUCKET_ID, appwrite_file_id)
-    
+        return self.storage.get_file_download(
+            APPWRITE_STORAGE_BUCKET_ID, appwrite_file_id
+        )
