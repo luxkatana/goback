@@ -7,6 +7,8 @@ from appwrite.services.storage import Storage
 from appwrite.input_file import InputFile
 import aiomysql
 
+# TODO: https requests maken met httpx voor echte async
+
 load_dotenv()
 APPWRITE_API_KEY = environ["APPWRITE_KEY"]
 APPWRITE_ENDPOINT = environ["APPWRITE_ENDPOINT"]
