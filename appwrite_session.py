@@ -3,9 +3,10 @@ from typing import Any
 from os import environ
 from appwrite.client import Client
 from hashlib import md5, sha256
+from io import BytesIO
 from appwrite.services.storage import Storage
 from appwrite.input_file import InputFile
-import aiomysql
+import aiomysql, httpx
 
 # TODO: https requests maken met httpx voor echte async
 
@@ -51,9 +52,18 @@ class SavedFile:
     def __init__(self, file_identifier: str, appwrite_file_id: str):
         self.file_identifier = file_identifier
         self.appwrite_file_id = appwrite_file_id
+        self.httpx_client: httpx.AsyncClient | None = None
 
 
 class AppwriteSession:
+    async def __aenter__(self):
+        self.httpx_client = httpx.AsyncClient()
+        return self
+
+    async def __aexit__(self, *_):
+        if self.httpx_client is not None:
+            await self.httpx_client.aclose()
+
     def __init__(self):
         self.client = (
             Client()
@@ -64,18 +74,38 @@ class AppwriteSession:
         self.storage = Storage(self.client)
 
     async def appwrite_publish_media(
-        self, file_identifier: str, file_content: str
+        self, file_identifier: str, file_content: bytes
     ) -> SavedFile:
         # TODO: check if file exists n stuff
 
-        md5_file_id = md5(file_identifier.encode()).hexdigest()
-        self.storage.create_file(
-            APPWRITE_STORAGE_BUCKET_ID,
-            md5_file_id,
-            InputFile.from_bytes(file_content.encode(), file_identifier),
-        )
+        with BytesIO() as io:
+            io.write(file_content)
+            md5_file_id = md5(file_identifier.encode()).hexdigest()
 
-        return SavedFile(file_identifier, md5_file_id)
+            headers = {
+                "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+                "X-Appwrite-Key": APPWRITE_API_KEY,
+            }
+            response = await self.httpx_client.post(
+                f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files",
+                headers=headers,
+                data={"fileId": md5_file_id},
+                files={"file": (file_identifier, io, "text/plain")},
+            )
+
+            if response.status_code == 409:
+                return (None, "File exists in the server")
+
+            print(response.text)
+            print(response.json())
+
+            """self.storage.create_file(
+                APPWRITE_STORAGE_BUCKET_ID,
+                md5_file_id,
+                InputFile.from_bytes(file_content.encode(), file_identifier),
+            )"""
+
+            return (SavedFile(file_identifier, md5_file_id), None)
 
     async def get_file_metadata(self, appwrite_file_id: str) -> dict[str, Any]:
         metadata = self.storage.get_file(APPWRITE_STORAGE_BUCKET_ID, appwrite_file_id)

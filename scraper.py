@@ -97,34 +97,37 @@ async def main(url: str) -> None:
     regex_valid_urls = re.compile(
         r"^(?:\/[\w\-./%~]+|(?:\.\.\/|\./)?[\w\-./%~]+|\?[^\s]+)$"
     )
-    session = AppwriteSession()
-    for attributes, element in useful_element:
-        for key, value in attributes.items():
-            if re.fullmatch(regex_valid_urls, value) is not None:
-                if value.startswith("/"):  # Path
-                    url_obj = urlparse(url)._replace(query=None, path=value)
-                    element_response = await scraper.request_html_of_link(
-                        url_obj.geturl()
-                    )
-                    unique_identifier = create_file_identifier(
-                        element_response.text, url_obj.hostname
-                    )
-                    savedfile = await session.appwrite_publish_media(
-                        unique_identifier, element_response.text
-                    )
-                    element.attrs[key] = (
-                        f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
-                    )
-    site_document_indentifier = create_file_identifier(
-        str(scraper.main_html_content), url
-    )
-    print(site_document_indentifier)
-    document_metadata = await session.appwrite_publish_media(
-        site_document_indentifier, str(scraper.main_html_content)
-    )
-    print(str(scraper.main_html_content))
-    print(document_metadata.appwrite_file_id)
-    await insert_site_row(url, document_metadata.appwrite_file_id)
+    async with AppwriteSession() as session:
+        for attributes, element in useful_element:
+            for key, value in attributes.items():
+                if re.fullmatch(regex_valid_urls, value) is not None:
+                    if value.startswith("/"):  # Path
+                        url_obj = urlparse(url)._replace(query=None, path=value)
+                        element_response = await scraper.request_html_of_link(
+                            url_obj.geturl()
+                        )
+                        unique_identifier = create_file_identifier(
+                            element_response.text, url_obj.hostname
+                        )
+                        savedfile, errormsg = await session.appwrite_publish_media(
+                            unique_identifier, element_response.content
+                        )
+                        if errormsg:
+                            print("Error: ", errormsg)
+                            return
+                        element.attrs[key] = (
+                            f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
+                        )
+        site_document_indentifier = create_file_identifier(
+            str(scraper.main_html_content), url
+        )
+        print(site_document_indentifier)
+        document_metadata = await session.appwrite_publish_media(
+            site_document_indentifier, str(scraper.main_html_content).encode()
+        )
+        print(str(scraper.main_html_content))
+        print(document_metadata.appwrite_file_id)
+        await insert_site_row(url, document_metadata.appwrite_file_id)
 
 
 if (
