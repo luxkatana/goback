@@ -20,18 +20,18 @@ MYSQL_PASS = environ["MYSQL_PASSWORD"]
 MYSQL_DB = environ["MYSQL_DB"]
 
 
-async def insert_site_row(site_url: str, document_filehash: str):
+async def insert_site_row(site_url: str, document_file_id: str):
     async with aiomysql.connect(
         MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DB
     ) as connection:
         async with connection.cursor() as cursor:
             cursor: aiomysql.Cursor
-            cursor.execute(
-                "INSERT INTO goback_sites_metadata (site_url, document_filehash) VALUES (?, ?)",
-                (site_url, document_filehash),
+            await cursor.execute(
+                "INSERT INTO goback_sites_metadata (site_url, document_file_id) VALUES (%s,%s)",
+                (site_url, document_file_id),
             )
 
-        connection.commit()
+        await connection.commit()
 
 
 def create_file_identifier(file_content: str, host_url: str) -> str:

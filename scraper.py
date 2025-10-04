@@ -119,11 +119,12 @@ async def main(url: str) -> None:
         str(scraper.main_html_content), url
     )
     print(site_document_indentifier)
-    await session.appwrite_publish_media(
+    document_metadata = await session.appwrite_publish_media(
         site_document_indentifier, str(scraper.main_html_content)
     )
     print(str(scraper.main_html_content))
-    await insert_site_row(url, site_document_indentifier)
+    print(document_metadata.appwrite_file_id)
+    await insert_site_row(url, document_metadata.appwrite_file_id)
 
 
 if (
