@@ -68,17 +68,13 @@ class GobackScraper:
 
                 case bs4.element.Tag:
                     element: bs4.element.Tag
-                    print("This is a tag =>", element.name)
-                    if useful_attrs := self.get_useful_attributes(
-                        element.attrs
-                    ):  # If it isnt empty
+                    if self.get_useful_attributes(element.attrs):  # If it isnt empty
                         useful_elements.append(element)
 
                     useful_elements.extend(await self.walk_through(element.children))
 
                 case bs4.element.NavigableString:
-                    if element != "\n":
-                        print("This is a string =>", str(element.string))
+                    ...
         return useful_elements
 
     async def request_html_of_link(self, url: str) -> httpx.Response:
@@ -90,9 +86,11 @@ async def main(url: str) -> None:
     scraper = GobackScraper(url)
     await scraper.load_html()
     useful_element = await scraper.walk_through_native()
+    """
     if len(useful_element) == 0:
         print("Nothing to save")
         exit(0)
+    """
 
     regex_valid_urls = re.compile(
         r"^(?:\/[\w\-./%~]+|(?:\.\.\/|\./)?[\w\-./%~]+|\?[^\s]+)$"
@@ -121,12 +119,21 @@ async def main(url: str) -> None:
         site_document_indentifier = create_file_identifier(
             str(scraper.main_html_content), url
         )
-        print(site_document_indentifier)
-        document_metadata = await session.appwrite_publish_media(
+        (document_metadata, errormsg) = await session.appwrite_publish_media(
             site_document_indentifier, str(scraper.main_html_content).encode()
         )
+        if errormsg:
+            print("Error while saving HTML document:", errormsg)
+            return
+
+        print("==========HTML_CONTENT==========")
         print(str(scraper.main_html_content))
-        print(document_metadata.appwrite_file_id)
+        print("================================")
+
+        print(
+            "file id to access with through appwrite:",
+            document_metadata.appwrite_file_id,
+        )
         await insert_site_row(url, document_metadata.appwrite_file_id)
 
 

@@ -1,14 +1,12 @@
-from flask import Flask, render_template, Response, Request, send_file
+from flask import Flask, render_template, Response
 from dotenv import load_dotenv
 from os import getenv
-from io import BytesIO
 from appwrite_session import AppwriteSession
 
 load_dotenv()
 
 
 app = Flask(__name__)
-appwritesession = AppwriteSession()
 
 
 @app.route("/login")
@@ -25,7 +23,9 @@ async def signup() -> Response:
 async def get_media(file_id: str):
     if len(file_id) != 32:  # Is een md5 hash, en die heeft altijd 32 karakters
         return "Invalid file id"
-    file_fetch_response = await appwritesession.get_file_content(file_id)
+
+    async with AppwriteSession() as session:
+        file_fetch_response = await session.get_file_content(file_id)
     return file_fetch_response
 
 

@@ -57,7 +57,12 @@ class SavedFile:
 
 class AppwriteSession:
     async def __aenter__(self):
-        self.httpx_client = httpx.AsyncClient()
+        self.httpx_client = httpx.AsyncClient(
+            headers={
+                "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+                "X-Appwrite-Key": APPWRITE_API_KEY,
+            }
+        )
         return self
 
     async def __aexit__(self, *_):
@@ -75,29 +80,21 @@ class AppwriteSession:
 
     async def appwrite_publish_media(
         self, file_identifier: str, file_content: bytes
-    ) -> SavedFile:
+    ) -> tuple[SavedFile | None, str | None]:
         # TODO: check if file exists n stuff
 
         with BytesIO() as io:
             io.write(file_content)
             md5_file_id = md5(file_identifier.encode()).hexdigest()
 
-            headers = {
-                "X-Appwrite-Project": APPWRITE_PROJECT_ID,
-                "X-Appwrite-Key": APPWRITE_API_KEY,
-            }
             response = await self.httpx_client.post(
                 f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files",
-                headers=headers,
                 data={"fileId": md5_file_id},
                 files={"file": (file_identifier, io, "text/plain")},
             )
 
             if response.status_code == 409:
                 return (None, "File exists in the server")
-
-            print(response.text)
-            print(response.json())
 
             """self.storage.create_file(
                 APPWRITE_STORAGE_BUCKET_ID,
@@ -107,11 +104,9 @@ class AppwriteSession:
 
             return (SavedFile(file_identifier, md5_file_id), None)
 
-    async def get_file_metadata(self, appwrite_file_id: str) -> dict[str, Any]:
-        metadata = self.storage.get_file(APPWRITE_STORAGE_BUCKET_ID, appwrite_file_id)
-        return metadata
-
     async def get_file_content(self, appwrite_file_id: str) -> bytes:
-        return self.storage.get_file_download(
-            APPWRITE_STORAGE_BUCKET_ID, appwrite_file_id
+
+        response = await self.httpx_client.get(
+            f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{appwrite_file_id}/download"
         )
+        return response.content
