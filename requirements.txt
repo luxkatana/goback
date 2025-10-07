@@ -1,0 +1,7 @@
+Flask[async]
+async-appwrite
+beautifulsoup4
+python-dotenv
+httpx
+lxml
+aiomysql
