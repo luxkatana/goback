@@ -1,6 +1,7 @@
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
-from appwrite_session import AppwriteSession, create_file_identifier, insert_site_row
+import hashlib
+from appwrite_session import AppwriteSession, create_file_identifier, insert_site_row, APPWRITE_ENDPOINT, APPWRITE_STORAGE_BUCKET_ID
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 import asyncio, bs4, httpx, re, os
@@ -107,24 +108,35 @@ async def main(url: str) -> None:
                         unique_identifier = create_file_identifier(
                             element_response.text, url_obj.hostname
                         )
-                        savedfile, errormsg = await session.appwrite_publish_media(
-                            unique_identifier, element_response.content
-                        )
-                        if errormsg:
-                            print("Error: ", errormsg)
-                            return
+                        try:
+                            savedfile = await session.appwrite_publish_media(
+                                unique_identifier, element_response.content
+                            )
+                        except Exception:
+                            print("File exists on the server, but I am just going to delete that")
+                            md5_hash = hashlib.md5(unique_identifier.encode()).hexdigest()
+                            _response = await session.httpx_client.delete(f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}")
+                            #_response.raise_for_status()
+                            savedfile = await session.appwrite_publish_media(
+                                unique_identifier, element_response.content
+                            )
+                
                         element.attrs[key] = (
                             f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
                         )
         site_document_indentifier = create_file_identifier(
             str(scraper.main_html_content), url
         )
-        (document_metadata, errormsg) = await session.appwrite_publish_media(
-            site_document_indentifier, str(scraper.main_html_content).encode()
-        )
-        if errormsg:
-            print("Error while saving HTML document:", errormsg)
-            return
+        try:
+            document_metadata= await session.appwrite_publish_media(
+                site_document_indentifier, str(scraper.main_html_content).encode()
+            )
+        except Exception:
+            md5_hash = hashlib.md5(site_document_indentifier.encode()).hexdigest()
+            await session.httpx_client.delete(f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}")
+            document_metadata= await session.appwrite_publish_media(
+                site_document_indentifier, str(scraper.main_html_content).encode()
+            )
 
         print("==========HTML_CONTENT==========")
         print(str(scraper.main_html_content))
@@ -134,6 +146,7 @@ async def main(url: str) -> None:
             "file id to access with through appwrite:",
             document_metadata.appwrite_file_id,
         )
+        print(f"Link to access file (based on env vars): {HOST_WEBSERVER_URL}/media/{document_metadata.appwrite_file_id}")
         await insert_site_row(url, document_metadata.appwrite_file_id)
 
 
@@ -142,8 +155,11 @@ if (
 ):  # Directly ran using the python3 interpreter, prevents accidental runs for example as importing this module
     url = input("Enter url to retrieve (live mode or something): ")
     url = (
-        "https://cooletaseen.hondsrugcollege.com/basic_document.html"
+        "https://cooletaseen.hondsrugcollege.com/document_img.html"
         if url == ""
         else url
     )  # Test url
+
+    if not url.startswith("http"):
+        url = f"https://{url}"
     asyncio.run(main(url))

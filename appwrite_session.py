@@ -80,7 +80,7 @@ class AppwriteSession:
 
     async def appwrite_publish_media(
         self, file_identifier: str, file_content: bytes
-    ) -> tuple[SavedFile | None, str | None]:
+    ) -> SavedFile:
         # TODO: check if file exists n stuff
 
         with BytesIO() as io:
@@ -93,16 +93,14 @@ class AppwriteSession:
                 files={"file": (file_identifier, io, "text/plain")},
             )
 
-            if response.status_code == 409:
-                return (None, "File exists in the server")
-
+            response.raise_for_status()
             """self.storage.create_file(
                 APPWRITE_STORAGE_BUCKET_ID,
                 md5_file_id,
                 InputFile.from_bytes(file_content.encode(), file_identifier),
             )"""
 
-            return (SavedFile(file_identifier, md5_file_id), None)
+            return SavedFile(file_identifier, md5_file_id)
 
     async def get_file_content(self, appwrite_file_id: str) -> bytes:
 
