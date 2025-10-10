@@ -1,14 +1,8 @@
 from dotenv import load_dotenv
-from typing import Any
 from os import environ
-from appwrite.client import Client
 from hashlib import md5, sha256
 from io import BytesIO
-from appwrite.services.storage import Storage
-from appwrite.input_file import InputFile
 import aiomysql, httpx
-
-# TODO: https requests maken met httpx voor echte async
 
 load_dotenv()
 APPWRITE_API_KEY = environ["APPWRITE_KEY"]
@@ -69,14 +63,7 @@ class AppwriteSession:
         if self.httpx_client is not None:
             await self.httpx_client.aclose()
 
-    def __init__(self):
-        self.client = (
-            Client()
-            .set_endpoint(APPWRITE_ENDPOINT)
-            .set_project(APPWRITE_PROJECT_ID)
-            .set_key(APPWRITE_API_KEY)
-        )
-        self.storage = Storage(self.client)
+    def __init__(self): ...
 
     async def appwrite_publish_media(
         self, file_identifier: str, file_content: bytes

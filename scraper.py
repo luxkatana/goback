@@ -1,7 +1,13 @@
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
 import hashlib
-from appwrite_session import AppwriteSession, create_file_identifier, insert_site_row, APPWRITE_ENDPOINT, APPWRITE_STORAGE_BUCKET_ID
+from appwrite_session import (
+    AppwriteSession,
+    create_file_identifier,
+    insert_site_row,
+    APPWRITE_ENDPOINT,
+    APPWRITE_STORAGE_BUCKET_ID,
+)
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 import asyncio, bs4, httpx, re, os
@@ -16,11 +22,7 @@ HOST_WEBSERVER_URL = os.getenv("GOBACK_MEDIA_URL")
 class GobackScraper:
     def __init__(self, url: str):
         self.url = url
-        self.httpx_client: httpx.AsyncClient = httpx.AsyncClient(
-            follow_redirects=True
-        )  # TODO: Implement ContextManagers so that http_client also gets closed
-        # Perhaps find a way to make __init__ also async so that we can call automatically self.load_html?
-
+        self.httpx_client: httpx.AsyncClient = httpx.AsyncClient(follow_redirects=True)
         self.main_html_content: BeautifulSoup
 
     async def load_html(self) -> None:
@@ -113,14 +115,20 @@ async def main(url: str) -> None:
                                 unique_identifier, element_response.content
                             )
                         except Exception:
-                            print("File exists on the server, but I am just going to delete that")
-                            md5_hash = hashlib.md5(unique_identifier.encode()).hexdigest()
-                            _response = await session.httpx_client.delete(f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}")
-                            #_response.raise_for_status()
+                            print(
+                                "File exists on the server, but I am just going to delete that"
+                            )
+                            md5_hash = hashlib.md5(
+                                unique_identifier.encode()
+                            ).hexdigest()
+                            _response = await session.httpx_client.delete(
+                                f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
+                            )
+                            # _response.raise_for_status()
                             savedfile = await session.appwrite_publish_media(
                                 unique_identifier, element_response.content
                             )
-                
+
                         element.attrs[key] = (
                             f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
                         )
@@ -128,13 +136,15 @@ async def main(url: str) -> None:
             str(scraper.main_html_content), url
         )
         try:
-            document_metadata= await session.appwrite_publish_media(
+            document_metadata = await session.appwrite_publish_media(
                 site_document_indentifier, str(scraper.main_html_content).encode()
             )
         except Exception:
             md5_hash = hashlib.md5(site_document_indentifier.encode()).hexdigest()
-            await session.httpx_client.delete(f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}")
-            document_metadata= await session.appwrite_publish_media(
+            await session.httpx_client.delete(
+                f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
+            )
+            document_metadata = await session.appwrite_publish_media(
                 site_document_indentifier, str(scraper.main_html_content).encode()
             )
 
@@ -146,7 +156,9 @@ async def main(url: str) -> None:
             "file id to access with through appwrite:",
             document_metadata.appwrite_file_id,
         )
-        print(f"Link to access file (based on env vars): {HOST_WEBSERVER_URL}/media/{document_metadata.appwrite_file_id}")
+        print(
+            f"Link to access file (based on env vars): {HOST_WEBSERVER_URL}/media/{document_metadata.appwrite_file_id}"
+        )
         await insert_site_row(url, document_metadata.appwrite_file_id)
 
 
