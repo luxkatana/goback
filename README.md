@@ -32,4 +32,5 @@ You'll see development and many commits within this project, this is an IT proje
 The following media types works:
 [x] html
 [x] pictures (jpeg)
+[x] music (mp3)
 [ ] Javascript

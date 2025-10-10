@@ -173,5 +173,5 @@ if (
     )  # Test url
 
     if not url.startswith("http"):
-        url = f"https://{url}"
+        url = f"http://{url}"
     asyncio.run(main(url))
