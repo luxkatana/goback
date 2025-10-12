@@ -1,0 +1,12 @@
+body {
+
+    font-size: 2rem;
+    font-style: sans-serif;
+    text-align: center;
+}
+
+h2 {
+    color: blue;
+    border: 10px dotted blue;
+}
+

@@ -1,12 +1,40 @@
+import aiomysql
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
-from appwrite_session import AppwriteSession, create_file_identifier, insert_site_row
+import hashlib
+from appwrite_session import (
+    AppwriteSession,
+    create_file_identifier,
+    insert_site_row,
+    APPWRITE_ENDPOINT,
+    APPWRITE_STORAGE_BUCKET_ID,
+)
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 import asyncio, bs4, httpx, re, os
 
 load_dotenv()
 URL_TAGS = frozenset(("href", "src"))
+
+
+def findcorresponding_mimetype(element: PageElement) -> str:
+    match element.name:
+        case "script":
+            return "application/javascript"
+
+    if element.name == "link" and "stylesheet" in element.attrs.get("rel", []):
+        return "text/css"
+
+    return "any"
+
+
+# returns: mimetype as str
+
+
+CORRESPONDING_MIMETYPES: dict[str, str] = {
+    "script": lambda element: element.attrs.get("link") == "stylesheet"
+    and element.attrs.get("href"),
+}
 APPWRITE_KEY = os.getenv("APPWRITE_KEY")
 HOST_WEBSERVER_URL = os.getenv("GOBACK_MEDIA_URL")
 #   "https://upgraded-space-invention-5rx6w7q5j74fp6r5-5000.app.github.dev"
@@ -15,11 +43,7 @@ HOST_WEBSERVER_URL = os.getenv("GOBACK_MEDIA_URL")
 class GobackScraper:
     def __init__(self, url: str):
         self.url = url
-        self.httpx_client: httpx.AsyncClient = httpx.AsyncClient(
-            follow_redirects=True
-        )  # TODO: Implement ContextManagers so that http_client also gets closed
-        # Perhaps find a way to make __init__ also async so that we can call automatically self.load_html?
-
+        self.httpx_client: httpx.AsyncClient = httpx.AsyncClient(follow_redirects=True)
         self.main_html_content: BeautifulSoup
 
     async def load_html(self) -> None:
@@ -97,6 +121,11 @@ async def main(url: str) -> None:
     )
     async with AppwriteSession() as session:
         for attributes, element in useful_element:
+            # an attempt to catch the mime type by html tag
+
+            mimetype = findcorresponding_mimetype(element)
+            print("Mime type:", mimetype)
+
             for key, value in attributes.items():
                 if re.fullmatch(regex_valid_urls, value) is not None:
                     if value.startswith("/"):  # Path
@@ -107,24 +136,51 @@ async def main(url: str) -> None:
                         unique_identifier = create_file_identifier(
                             element_response.text, url_obj.hostname
                         )
-                        savedfile, errormsg = await session.appwrite_publish_media(
-                            unique_identifier, element_response.content
-                        )
-                        if errormsg:
-                            print("Error: ", errormsg)
-                            return
+                        try:
+                            savedfile = await session.appwrite_publish_media(
+                                unique_identifier, element_response.content
+                            )
+                        except Exception:
+                            print(
+                                "File exists on the server, but I am just going to delete that"
+                            )
+                            md5_hash = hashlib.md5(
+                                unique_identifier.encode()
+                            ).hexdigest()
+                            await session.httpx_client.delete(
+                                f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
+                            )
+                            # _response.raise_for_status()
+                            savedfile = await session.appwrite_publish_media(
+                                unique_identifier, element_response.content
+                            )
+
                         element.attrs[key] = (
                             f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
                         )
+                        async with session.mysql_conn.cursor() as cursor:
+                            cursor: aiomysql.Cursor
+                            print(mimetype)
+                            await cursor.execute(
+                                "INSERT INTO goback_assets_metadata (file_id, mimetype) VALUES (%s, %s)",
+                                (savedfile.appwrite_file_id, mimetype),
+                            )
+                            await session.mysql_conn.commit()
         site_document_indentifier = create_file_identifier(
             str(scraper.main_html_content), url
         )
-        (document_metadata, errormsg) = await session.appwrite_publish_media(
-            site_document_indentifier, str(scraper.main_html_content).encode()
-        )
-        if errormsg:
-            print("Error while saving HTML document:", errormsg)
-            return
+        try:
+            document_metadata = await session.appwrite_publish_media(
+                site_document_indentifier, str(scraper.main_html_content).encode()
+            )
+        except Exception:
+            md5_hash = hashlib.md5(site_document_indentifier.encode()).hexdigest()
+            await session.httpx_client.delete(
+                f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
+            )
+            document_metadata = await session.appwrite_publish_media(
+                site_document_indentifier, str(scraper.main_html_content).encode()
+            )
 
         print("==========HTML_CONTENT==========")
         print(str(scraper.main_html_content))
@@ -134,6 +190,9 @@ async def main(url: str) -> None:
             "file id to access with through appwrite:",
             document_metadata.appwrite_file_id,
         )
+        print(
+            f"Link to access file (based on env vars): {HOST_WEBSERVER_URL}/media/{document_metadata.appwrite_file_id}"
+        )
         await insert_site_row(url, document_metadata.appwrite_file_id)
 
 
@@ -142,8 +201,11 @@ if (
 ):  # Directly ran using the python3 interpreter, prevents accidental runs for example as importing this module
     url = input("Enter url to retrieve (live mode or something): ")
     url = (
-        "https://cooletaseen.hondsrugcollege.com/basic_document.html"
+        "https://cooletaseen.hondsrugcollege.com/document_img.html"
         if url == ""
         else url
     )  # Test url
+
+    if not url.startswith("http"):
+        url = f"http://{url}"
     asyncio.run(main(url))

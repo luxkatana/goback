@@ -1,30 +1,23 @@
 from dotenv import load_dotenv
-from typing import Any
 from os import environ
-from appwrite.client import Client
 from hashlib import md5, sha256
 from io import BytesIO
-from appwrite.services.storage import Storage
-from appwrite.input_file import InputFile
 import aiomysql, httpx
-
-# TODO: https requests maken met httpx voor echte async
 
 load_dotenv()
 APPWRITE_API_KEY = environ["APPWRITE_KEY"]
 APPWRITE_ENDPOINT = environ["APPWRITE_ENDPOINT"]
 APPWRITE_PROJECT_ID = environ["APPWRITE_PROJECT_ID"]
 APPWRITE_STORAGE_BUCKET_ID = environ["APPWRITE_STORAGE_BUCKET_ID"]
-MYSQL_HOST = environ["MYSQL_HOST"]
-MYSQL_USER = environ["MYSQL_USER"]
-MYSQL_PASS = environ["MYSQL_PASSWORD"]
-MYSQL_DB = environ["MYSQL_DB"]
+MYSQL_HOST: str = environ["MYSQL_HOST"]
+MYSQL_USER: str = environ["MYSQL_USER"]
+MYSQL_PASS: str = environ["MYSQL_PASSWORD"]
+MYSQL_DB: str = environ["MYSQL_DB"]
+MYSQL_CREDS_TUPLE: tuple[str, ...] = (MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DB)
 
 
 async def insert_site_row(site_url: str, document_file_id: str):
-    async with aiomysql.connect(
-        MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DB
-    ) as connection:
+    async with aiomysql.connect(*MYSQL_CREDS_TUPLE) as connection:
         async with connection.cursor() as cursor:
             cursor: aiomysql.Cursor
             await cursor.execute(
@@ -57,6 +50,9 @@ class SavedFile:
 
 class AppwriteSession:
     async def __aenter__(self):
+        self.mysql_conn: aiomysql.Connection = await aiomysql.connect(
+            *MYSQL_CREDS_TUPLE
+        )
         self.httpx_client = httpx.AsyncClient(
             headers={
                 "X-Appwrite-Project": APPWRITE_PROJECT_ID,
@@ -66,22 +62,16 @@ class AppwriteSession:
         return self
 
     async def __aexit__(self, *_):
+        if self.mysql_conn is not None:
+            self.mysql_conn.close()
         if self.httpx_client is not None:
             await self.httpx_client.aclose()
 
-    def __init__(self):
-        self.client = (
-            Client()
-            .set_endpoint(APPWRITE_ENDPOINT)
-            .set_project(APPWRITE_PROJECT_ID)
-            .set_key(APPWRITE_API_KEY)
-        )
-        self.storage = Storage(self.client)
+    def __init__(self): ...
 
     async def appwrite_publish_media(
         self, file_identifier: str, file_content: bytes
-    ) -> tuple[SavedFile | None, str | None]:
-        # TODO: check if file exists n stuff
+    ) -> SavedFile:
 
         with BytesIO() as io:
             io.write(file_content)
@@ -93,16 +83,14 @@ class AppwriteSession:
                 files={"file": (file_identifier, io, "text/plain")},
             )
 
-            if response.status_code == 409:
-                return (None, "File exists in the server")
-
+            response.raise_for_status()
             """self.storage.create_file(
                 APPWRITE_STORAGE_BUCKET_ID,
                 md5_file_id,
                 InputFile.from_bytes(file_content.encode(), file_identifier),
             )"""
 
-            return (SavedFile(file_identifier, md5_file_id), None)
+            return SavedFile(file_identifier, md5_file_id)
 
     async def get_file_content(self, appwrite_file_id: str) -> bytes:
 
