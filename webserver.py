@@ -1,4 +1,5 @@
-from flask import Flask, render_template, Response
+import aiomysql
+from flask import Flask, make_response, render_template, Response
 from dotenv import load_dotenv
 from os import getenv
 from appwrite_session import AppwriteSession
@@ -26,7 +27,23 @@ async def get_media(file_id: str):
 
     async with AppwriteSession() as session:
         file_fetch_response = await session.get_file_content(file_id)
-    return file_fetch_response
+        response_object = make_response(file_fetch_response)
+
+        async with session.mysql_conn.cursor() as cursor:
+            cursor: aiomysql.Cursor
+            await cursor.execute(
+                "SELECT mimetype FROM goback_assets_metadata WHERE file_id = %s;",
+                (file_id,),
+            )
+            result = tuple(await cursor.fetchall())
+            if (
+                len(result) == 0 or (inner_str := result[0][0]) == "any"
+            ):  # Assume its just a text/plain
+                response_object.content_type = "text/html"
+            else:
+                response_object.content_type = inner_str
+
+    return response_object
 
 
 @app.get("/")

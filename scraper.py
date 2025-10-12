@@ -1,3 +1,4 @@
+import aiomysql
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
 import hashlib
@@ -14,6 +15,26 @@ import asyncio, bs4, httpx, re, os
 
 load_dotenv()
 URL_TAGS = frozenset(("href", "src"))
+
+
+def findcorresponding_mimetype(element: PageElement) -> str:
+    match element.name:
+        case "script":
+            return "application/javascript"
+
+    if element.name == "link" and "stylesheet" in element.attrs.get("rel", []):
+        return "text/css"
+
+    return "any"
+
+
+# returns: mimetype as str
+
+
+CORRESPONDING_MIMETYPES: dict[str, str] = {
+    "script": lambda element: element.attrs.get("link") == "stylesheet"
+    and element.attrs.get("href"),
+}
 APPWRITE_KEY = os.getenv("APPWRITE_KEY")
 HOST_WEBSERVER_URL = os.getenv("GOBACK_MEDIA_URL")
 #   "https://upgraded-space-invention-5rx6w7q5j74fp6r5-5000.app.github.dev"
@@ -100,6 +121,11 @@ async def main(url: str) -> None:
     )
     async with AppwriteSession() as session:
         for attributes, element in useful_element:
+            # an attempt to catch the mime type by html tag
+
+            mimetype = findcorresponding_mimetype(element)
+            print("Mime type:", mimetype)
+
             for key, value in attributes.items():
                 if re.fullmatch(regex_valid_urls, value) is not None:
                     if value.startswith("/"):  # Path
@@ -121,7 +147,7 @@ async def main(url: str) -> None:
                             md5_hash = hashlib.md5(
                                 unique_identifier.encode()
                             ).hexdigest()
-                            _response = await session.httpx_client.delete(
+                            await session.httpx_client.delete(
                                 f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
                             )
                             # _response.raise_for_status()
@@ -132,6 +158,14 @@ async def main(url: str) -> None:
                         element.attrs[key] = (
                             f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
                         )
+                        async with session.mysql_conn.cursor() as cursor:
+                            cursor: aiomysql.Cursor
+                            print(mimetype)
+                            await cursor.execute(
+                                "INSERT INTO goback_assets_metadata (file_id, mimetype) VALUES (%s, %s)",
+                                (savedfile.appwrite_file_id, mimetype),
+                            )
+                            await session.mysql_conn.commit()
         site_document_indentifier = create_file_identifier(
             str(scraper.main_html_content), url
         )

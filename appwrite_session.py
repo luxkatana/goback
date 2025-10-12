@@ -9,16 +9,15 @@ APPWRITE_API_KEY = environ["APPWRITE_KEY"]
 APPWRITE_ENDPOINT = environ["APPWRITE_ENDPOINT"]
 APPWRITE_PROJECT_ID = environ["APPWRITE_PROJECT_ID"]
 APPWRITE_STORAGE_BUCKET_ID = environ["APPWRITE_STORAGE_BUCKET_ID"]
-MYSQL_HOST = environ["MYSQL_HOST"]
-MYSQL_USER = environ["MYSQL_USER"]
-MYSQL_PASS = environ["MYSQL_PASSWORD"]
-MYSQL_DB = environ["MYSQL_DB"]
+MYSQL_HOST: str = environ["MYSQL_HOST"]
+MYSQL_USER: str = environ["MYSQL_USER"]
+MYSQL_PASS: str = environ["MYSQL_PASSWORD"]
+MYSQL_DB: str = environ["MYSQL_DB"]
+MYSQL_CREDS_TUPLE: tuple[str, ...] = (MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DB)
 
 
 async def insert_site_row(site_url: str, document_file_id: str):
-    async with aiomysql.connect(
-        MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DB
-    ) as connection:
+    async with aiomysql.connect(*MYSQL_CREDS_TUPLE) as connection:
         async with connection.cursor() as cursor:
             cursor: aiomysql.Cursor
             await cursor.execute(
@@ -51,6 +50,9 @@ class SavedFile:
 
 class AppwriteSession:
     async def __aenter__(self):
+        self.mysql_conn: aiomysql.Connection = await aiomysql.connect(
+            *MYSQL_CREDS_TUPLE
+        )
         self.httpx_client = httpx.AsyncClient(
             headers={
                 "X-Appwrite-Project": APPWRITE_PROJECT_ID,
@@ -60,6 +62,8 @@ class AppwriteSession:
         return self
 
     async def __aexit__(self, *_):
+        if self.mysql_conn is not None:
+            self.mysql_conn.close()
         if self.httpx_client is not None:
             await self.httpx_client.aclose()
 
@@ -68,7 +72,6 @@ class AppwriteSession:
     async def appwrite_publish_media(
         self, file_identifier: str, file_content: bytes
     ) -> SavedFile:
-        # TODO: check if file exists n stuff
 
         with BytesIO() as io:
             io.write(file_content)
