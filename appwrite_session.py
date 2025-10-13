@@ -25,7 +25,7 @@ async def insert_site_row(site_url: str, document_file_id: str):
                 (site_url, document_file_id),
             )
 
-        await connection.commit()
+            await connection.commit()
 
 
 def create_file_identifier(file_content: str, host_url: str) -> str:

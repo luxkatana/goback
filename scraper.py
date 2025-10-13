@@ -11,7 +11,7 @@ from appwrite_session import (
 )
 from urllib.parse import urlparse
 from dotenv import load_dotenv
-import asyncio, bs4, httpx, re, os
+import asyncio, bs4, httpx, os
 
 load_dotenv()
 URL_TAGS = frozenset(("href", "src"))
@@ -28,16 +28,8 @@ def findcorresponding_mimetype(element: PageElement) -> str:
     return "any"
 
 
-# returns: mimetype as str
-
-
-CORRESPONDING_MIMETYPES: dict[str, str] = {
-    "script": lambda element: element.attrs.get("link") == "stylesheet"
-    and element.attrs.get("href"),
-}
 APPWRITE_KEY = os.getenv("APPWRITE_KEY")
 HOST_WEBSERVER_URL = os.getenv("GOBACK_MEDIA_URL")
-#   "https://upgraded-space-invention-5rx6w7q5j74fp6r5-5000.app.github.dev"
 
 
 class GobackScraper:
@@ -83,6 +75,7 @@ class GobackScraper:
         )
 
     # This may be useful in the future, in case we need more complexity
+    """
     async def walk_through(
         self, elements: list[PageElement]
     ) -> list[PageElement] | None:
@@ -100,10 +93,16 @@ class GobackScraper:
                 case bs4.element.NavigableString:
                     ...
         return useful_elements
+    """
 
-    async def request_html_of_link(self, url: str) -> httpx.Response:
+    async def request_html_of_link(
+        self, url: str, return_mimetype: bool = False
+    ) -> tuple[httpx.Response, str]:
         response = await self.httpx_client.get(url)
-        return response.raise_for_status()
+        return (
+            response.raise_for_status(),
+            response.headers.get("Content-Type") if return_mimetype is True else False,
+        )
 
 
 async def main(url: str) -> None:
@@ -116,56 +115,77 @@ async def main(url: str) -> None:
         exit(0)
     """
 
-    regex_valid_urls = re.compile(
-        r"^(?:\/[\w\-./%~]+|(?:\.\.\/|\./)?[\w\-./%~]+|\?[^\s]+)$"
-    )
     async with AppwriteSession() as session:
         for attributes, element in useful_element:
             # an attempt to catch the mime type by html tag
 
             mimetype = findcorresponding_mimetype(element)
-            print("Mime type:", mimetype)
 
             for key, value in attributes.items():
-                if re.fullmatch(regex_valid_urls, value) is not None:
-                    if value.startswith("/"):  # Path
-                        url_obj = urlparse(url)._replace(query=None, path=value)
-                        element_response = await scraper.request_html_of_link(
-                            url_obj.geturl()
-                        )
-                        unique_identifier = create_file_identifier(
-                            element_response.text, url_obj.hostname
-                        )
-                        try:
-                            savedfile = await session.appwrite_publish_media(
-                                unique_identifier, element_response.content
-                            )
-                        except Exception:
-                            print(
-                                "File exists on the server, but I am just going to delete that"
-                            )
-                            md5_hash = hashlib.md5(
-                                unique_identifier.encode()
-                            ).hexdigest()
-                            await session.httpx_client.delete(
-                                f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
-                            )
-                            # _response.raise_for_status()
-                            savedfile = await session.appwrite_publish_media(
-                                unique_identifier, element_response.content
-                            )
+                url_check = urlparse(value)
+                asset_response: None | httpx.Response = None
+                if len(url_check.scheme) == 0 and any(
+                    [url_check.path.startswith(x) for x in [".", "#"]]
+                ):
+                    print(
+                        f"Scraper doesnt support urls such as {value} and therefore will be ignored"
+                    )
+                    continue
 
-                        element.attrs[key] = (
-                            f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
+                if (
+                    len(url_check.scheme) == 0 and len(url_check.path) != 0
+                ):  # Doesnt have a scheme, and therefore is something like /here.jpg or here.jpg
+                    url_check = urlparse(url)._replace(query=None, path=url_check.path)
+
+                try:
+                    print(value)
+                    print(url_check.geturl())
+                    asset_response, optional_mimetype = (
+                        await scraper.request_html_of_link(
+                            url_check.geturl(),
+                            return_mimetype=(
+                                asset_response == "any"
+                            ),  # An attempt on obtaining the mime-type by response
                         )
-                        async with session.mysql_conn.cursor() as cursor:
-                            cursor: aiomysql.Cursor
-                            print(mimetype)
-                            await cursor.execute(
-                                "INSERT INTO goback_assets_metadata (file_id, mimetype) VALUES (%s, %s)",
-                                (savedfile.appwrite_file_id, mimetype),
-                            )
-                            await session.mysql_conn.commit()
+                    )
+                except httpx._exceptions.HTTPStatusError as e:
+                    print(
+                        f"Error when trying to fetch (this element will therefore be skipped) {url_check}\t{e}"
+                    )
+                    continue
+
+                if optional_mimetype is not False:
+                    mimetype = optional_mimetype
+                unique_identifier = create_file_identifier(
+                    asset_response.text, urlparse(url).hostname
+                )
+                try:
+                    savedfile = await session.appwrite_publish_media(
+                        unique_identifier, asset_response.content
+                    )
+                except Exception:
+                    print(
+                        "File exists on the server, but I am just going to delete that"
+                    )
+                    md5_hash = hashlib.md5(unique_identifier.encode()).hexdigest()
+                    await session.httpx_client.delete(
+                        f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
+                    )
+                    # _response.raise_for_status()
+                    savedfile = await session.appwrite_publish_media(
+                        unique_identifier, asset_response.content
+                    )
+
+                element.attrs[key] = (
+                    f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
+                )
+                async with session.mysql_conn.cursor() as cursor:
+                    cursor: aiomysql.Cursor
+                    await cursor.execute(
+                        "INSERT INTO goback_assets_metadata (file_id, mimetype) VALUES (%s, %s)",
+                        (savedfile.appwrite_file_id, mimetype),
+                    )
+                    await session.mysql_conn.commit()
         site_document_indentifier = create_file_identifier(
             str(scraper.main_html_content), url
         )
