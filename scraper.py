@@ -138,8 +138,6 @@ async def main(url: str) -> None:
                     url_check = urlparse(url)._replace(query=None, path=url_check.path)
 
                 try:
-                    print(value)
-                    print(url_check.geturl())
                     asset_response, optional_mimetype = (
                         await scraper.request_html_of_link(
                             url_check.geturl(),

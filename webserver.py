@@ -1,23 +1,104 @@
 import aiomysql
-from flask import Flask, make_response, render_template, Response
+import secrets
+from flask import Flask, make_response, redirect, render_template, Response
+import flask_login
+from extensions import db
 from dotenv import load_dotenv
-from os import getenv
+from os import environ, getenv
 from appwrite_session import AppwriteSession
+from models import User
+from werkzeug.security import check_password_hash, generate_password_hash
+from flask_login import LoginManager, login_required, login_user, logout_user
+import forms
+
 
 load_dotenv()
 
 
 app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = environ["MYSQL_CONNECTION_STRING"]
+app.secret_key = secrets.token_urlsafe(40)
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 
-@app.route("/login")
+@login_manager.user_loader
+def load_user(user_id: int) -> User | None:
+    return db.session.query(User).where(User.user_id == user_id).first()
+
+
+db.init_app(app)
+with app.app_context():
+    db.create_all()
+
+
+@app.route("/login", methods=["GET", "POST"])
 async def login() -> Response:
-    return render_template("login.html")
+    form = forms.LoginForm()
+    msg = ""
+    if form.validate_on_submit():
+        corresponding_user = (
+            db.session.query(User).where(User.email == form.email.data).first()
+        )
+
+        if (
+            corresponding_user is not None
+            and check_password_hash(corresponding_user.password, form.password.data)
+            is True
+        ):
+            msg = "Correct!"
+            login_user(corresponding_user)
+            return redirect("/dashboard")
+        else:
+            msg = "Invalid user/password"
+
+    return render_template("login.html", form=form, msg=msg)
 
 
-@app.route("/signup")
+@app.get("/dashboard")
+@login_required
+def dashboard_route() -> Response:
+    print(flask_login.current_user)
+    return render_template("dashboard.html", current_user=flask_login.current_user)
+
+
+@app.route("/create", methods=["GET", "POST"])
+@login_required
+def create_route() -> Response:
+    pass
+
+
+@app.get("/logout")
+def logout_route() -> Response:
+    logout_user()
+    return redirect("/")
+
+
+@app.route("/signup", methods=["GET", "POST"])
 async def signup() -> Response:
-    return render_template("signup.html")
+    registration_form = forms.RegistrationForm()
+    message = ""
+    if registration_form.validate_on_submit():
+        if (
+            db.session.query(User)
+            .where(User.email == registration_form.email.data)
+            .first()
+            is not None
+        ):
+            message = "This email is already taken, make another one "
+        else:
+            hashed_password = generate_password_hash(registration_form.email.data)
+            newuser = User(
+                username=registration_form.username.data,
+                password=hashed_password,
+                email=registration_form.email.data,
+            )
+            db.session.add(newuser)
+            db.session.commit()
+            login_user(newuser)
+            return redirect("/dashboard")
+
+    return render_template("signup.html", form=registration_form, message=message)
 
 
 @app.get("/media/<string:file_id>")
@@ -48,7 +129,7 @@ async def get_media(file_id: str):
 
 @app.get("/")
 async def index() -> Response:
-    return render_template("index.html")
+    return render_template("index.html", current_user=flask_login.current_user)
 
 
 if __name__ == "__main__":

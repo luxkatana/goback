@@ -1,8 +1,43 @@
 <!DOCTYPE html>
 <html>
+    <head>
+<style>
+body {
+    text-align: center;
+}
+        #msg {
+            border: 5px solid red;
+        }
 
-    <body style="text-align: center;font-family: sans-serif;">
+</style>
+    </head>
+
+    <body style="">
         <h1>Signup to continue</h1>
+        {%if message|length > 0%}
+        <div id="msg"><p>{{message}}</p></div>
+
+        {%endif%}
+
+        <form method="POST" action="/signup">
+            {{form.hidden_tag()}}
+            <p>
+            {{form.email.label}}
+            {{form.email(size=254)}}
+            </p>
+            <p>
+            {{form.username.label}}
+            {{form.username(size=10)}}
+            </p>
+            <p>
+            {{form.password.label}}
+            {{form.password(size=20)}}
+            </p>
+            <p>
+            {{form.submit}}
+            </p>
+
+        </form>
     </body>
 
 </html>

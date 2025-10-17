@@ -16,6 +16,9 @@
 
     <body>
         <h1>Make a cool backup with Ourback</h1>
+        {%if current_user.is_authenticated%}
+        <a href="/dashboard">Hey, welcome back! Click here to go to the dashboard</a>
+        {%endif%}
         <h2><a href="/login">Login to continue</a></h2>
         <p>Don't have an account? <a href="/signup">Sign up</a></p>
 
