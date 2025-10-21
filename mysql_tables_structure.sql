@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS goback_sites_metadata (
     row_id INT NOT NULL AUTO_INCREMENT,
     site_url varchar (100) NOT NULL, -- De site URL
     document_file_id varchar(37) NOT NULL, -- De file hash van het html document dat is opgeslagen in appwrite (file_id)
+    user_id INT NOT NULL DEFAULT -1, 
     PRIMARY KEY (row_id) -- spreekt wel voor zich, hoop ik :P
 );
 

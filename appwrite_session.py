@@ -16,13 +16,13 @@ MYSQL_DB: str = environ["MYSQL_DB"]
 MYSQL_CREDS_TUPLE: tuple[str, ...] = (MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DB)
 
 
-async def insert_site_row(site_url: str, document_file_id: str):
+async def insert_site_row(site_url: str, document_file_id: str, user_id: int = -1):
     async with aiomysql.connect(*MYSQL_CREDS_TUPLE) as connection:
         async with connection.cursor() as cursor:
             cursor: aiomysql.Cursor
             await cursor.execute(
-                "INSERT INTO goback_sites_metadata (site_url, document_file_id) VALUES (%s,%s)",
-                (site_url, document_file_id),
+                "INSERT INTO goback_sites_metadata (site_url, document_file_id, user_id) VALUES (%s,%s,%s)",
+                (site_url, document_file_id, user_id),
             )
 
             await connection.commit()

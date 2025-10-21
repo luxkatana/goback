@@ -1,104 +1,133 @@
+import asyncio
+from datetime import datetime
+from threading import Thread
 import aiomysql
 import secrets
-from flask import Flask, make_response, redirect, render_template, Response
-import flask_login
+from flask import (
+    Flask,
+    jsonify,
+    make_response,
+    Response,
+    request,
+)
+from flask_cors import CORS
+from httpx import HTTPStatusError
+from scraper import main as scrape_site
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    get_jwt_identity,
+    jwt_required,
+)
 from extensions import db
 from dotenv import load_dotenv
 from os import environ, getenv
 from appwrite_session import AppwriteSession
-from models import User
+from models import JobTask, User
 from werkzeug.security import check_password_hash, generate_password_hash
-from flask_login import LoginManager, login_required, login_user, logout_user
-import forms
 
 
 load_dotenv()
 
 
 app = Flask(__name__)
+CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = environ["MYSQL_CONNECTION_STRING"]
 app.secret_key = secrets.token_urlsafe(40)
-login_manager = LoginManager()
-login_manager.init_app(app)
-
-
-@login_manager.user_loader
-def load_user(user_id: int) -> User | None:
-    return db.session.query(User).where(User.user_id == user_id).first()
-
+app.config["JWT_SECRET_KEY"] = secrets.token_urlsafe(40)
+jwt = JWTManager(app)
 
 db.init_app(app)
 with app.app_context():
     db.create_all()
 
 
-@app.route("/login", methods=["GET", "POST"])
+@app.post("/api/login")
 async def login() -> Response:
-    form = forms.LoginForm()
-    msg = ""
-    if form.validate_on_submit():
-        corresponding_user = (
-            db.session.query(User).where(User.email == form.email.data).first()
-        )
-
+    json_payload = request.get_json()
+    email = json_payload.get("email")
+    password = json_payload.get("password")
+    if email and password:
+        corresponding_user = db.session.query(User).where(User.email == email).first()
         if (
             corresponding_user is not None
-            and check_password_hash(corresponding_user.password, form.password.data)
-            is True
+            and check_password_hash(corresponding_user.password, password) is True
         ):
-            msg = "Correct!"
-            login_user(corresponding_user)
-            return redirect("/dashboard")
+            access_token = create_access_token(email)
+            return jsonify(access_token=access_token)
         else:
-            msg = "Invalid user/password"
+            return jsonify(error=2, msg="Bad credentials")
 
-    return render_template("login.html", form=form, msg=msg)
-
-
-@app.get("/dashboard")
-@login_required
-def dashboard_route() -> Response:
-    print(flask_login.current_user)
-    return render_template("dashboard.html", current_user=flask_login.current_user)
+    return jsonify(error=1, msg="email and password is missing")
 
 
-@app.route("/create", methods=["GET", "POST"])
-@login_required
-def create_route() -> Response:
-    pass
+def task_handler(user_id: int, job_id: int, url: str):
+    with app.app_context():
+        user = db.session.query(User).where(User.user_id == user_id).first()
+        job = db.session.query(JobTask).where(JobTask.job_id == job_id).first()
+        try:
+            file_id = asyncio.run(scrape_site(url, user, job))
+        except HTTPStatusError as e:
+            if e.request.url == url:
+                job.change_status(
+                    f"requested URL host sent error code {e.response.status_code}"
+                )
+            else:
+                job.change_status(
+                    f"Asset of requested URL has sent error code {e.response.status_code}"
+                )
+        except Exception as e:
+            job.change_status(str(e))
+        else:
+            job.change_status(f"Success: {file_id}")
+        print("Finished")
+        print(job.status)
+        # db.session.add(job)
+        db.session.commit()
 
 
-@app.get("/logout")
-def logout_route() -> Response:
-    logout_user()
-    return redirect("/")
+@app.post("/api/scrape")
+@jwt_required()
+async def scrape_site_route() -> Response:
+    user = db.session.query(User).where(User.email == get_jwt_identity()).first()
+    json_payload = request.get_json()
+    url = json_payload.get("url")
+    if not url:
+        return jsonify(error=1, msg="URL is missing")
+
+    new_job = JobTask(user_id=user.user_id, created_at=datetime.now())
+    db.session.add(new_job)
+    db.session.commit()
+
+    Thread(target=task_handler, args=(user.user_id, new_job.job_id, url)).start()
+
+    return jsonify(
+        msg="Created and accepted (is running as bg task)", job_task_id=new_job.job_id
+    )
 
 
-@app.route("/signup", methods=["GET", "POST"])
+@app.post("/api/signup")
 async def signup() -> Response:
-    registration_form = forms.RegistrationForm()
-    message = ""
-    if registration_form.validate_on_submit():
-        if (
-            db.session.query(User)
-            .where(User.email == registration_form.email.data)
-            .first()
-            is not None
-        ):
-            message = "This email is already taken, make another one "
-        else:
-            hashed_password = generate_password_hash(registration_form.email.data)
-            newuser = User(
-                username=registration_form.username.data,
-                password=hashed_password,
-                email=registration_form.email.data,
-            )
-            db.session.add(newuser)
-            db.session.commit()
-            login_user(newuser)
-            return redirect("/dashboard")
+    json_payload = request.get_json()
+    email = json_payload.get("email")
+    password = json_payload.get("password")
+    username = json_payload.get("username")
+    if db.session.query(User).where(User.email == email).first() is not None:
+        return jsonify(error=1, msg="Email exists, use another email")
 
-    return render_template("signup.html", form=registration_form, message=message)
+    if len(username) >= 10:
+        return jsonify(error=2, msg="Username should be max 10 characters")
+    elif len(password) >= 210:
+        return jsonify(error=3, msg="Password should be max 210 characters")
+    elif len(email) >= 254:
+        return jsonify(error=4, msg="Email should be max 254 characters")
+
+    hashed_password = generate_password_hash(password)
+    newuser = User(username=username, password=hashed_password, email=email)
+    db.session.add(newuser)
+    db.session.commit()
+    access_token = create_access_token(email)
+    return jsonify(created=True, access_token=access_token)
 
 
 @app.get("/media/<string:file_id>")
@@ -125,11 +154,6 @@ async def get_media(file_id: str):
                 response_object.content_type = inner_str
 
     return response_object
-
-
-@app.get("/")
-async def index() -> Response:
-    return render_template("index.html", current_user=flask_login.current_user)
 
 
 if __name__ == "__main__":
