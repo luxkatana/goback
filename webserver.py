@@ -61,6 +61,21 @@ async def login() -> Response:
     return jsonify(error=1, msg="email and password is missing")
 
 
+@app.get("/api/job/<string:job_id>")
+@jwt_required()
+async def job_status_route(job_id: str) -> Response:
+    usr_email: str = get_jwt_identity()
+    user_id = db.session.query(User).where(User.email == usr_email).first().user_id
+    jobtask = (
+        db.session.query(JobTask)
+        .where(JobTask.user_id == user_id, JobTask.job_id == job_id)
+        .first()
+    )
+    if jobtask is None:
+        return jsonify(error=1, msg=f"There is no jobtask with id {job_id}")
+    return jsonify(jobtask.as_dict())
+
+
 def task_handler(user_id: int, job_id: int, url: str):
     with app.app_context():
         user = db.session.query(User).where(User.user_id == user_id).first()

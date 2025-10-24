@@ -2,7 +2,8 @@ from dotenv import load_dotenv
 from os import environ
 from hashlib import md5, sha256
 from io import BytesIO
-import aiomysql, httpx
+import aiomysql
+import httpx
 
 load_dotenv()
 APPWRITE_API_KEY = environ["APPWRITE_KEY"]
