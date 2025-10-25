@@ -8,13 +8,10 @@
 /goback-frontend/yarn-error.log*
 /goback-frontend/pnpm-debug.log*
 /goback-frontend/lerna-debug.log*
-/goback-frontend/
 /goback-frontend/node_modules
 /goback-frontend/dist
 /goback-frontend/dist-ssr
 /goback-frontend/*.local
-/goback-frontend/
-/goback-frontend/# Editor directories and files
 /goback-frontend/.vscode/*
 /goback-frontend/!.vscode/extensions.json
 /goback-frontend/.idea

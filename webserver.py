@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime
 from threading import Thread
+import email_validator
 import aiomysql
 import secrets
 from flask import (
@@ -136,6 +137,10 @@ async def signup() -> Response:
         return jsonify(error=3, msg="Password should be max 210 characters")
     elif len(email) >= 254:
         return jsonify(error=4, msg="Email should be max 254 characters")
+    try:
+        email_validator.validate_email(email)
+    except email_validator.EmailNotValidError:
+        return jsonify(error=5, msg="Email is not valid")
 
     hashed_password = generate_password_hash(password)
     newuser = User(username=username, password=hashed_password, email=email)
