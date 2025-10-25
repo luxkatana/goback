@@ -4,9 +4,6 @@ import { useContext, useEffect } from "react";
 import { AuthContext, type AuthContextProperties } from "../components/AuthContext";
 export default function HomePage() {
 	const credentialsman: AuthContextProperties = useContext(AuthContext)!;
-	useEffect(() => {
-		console.log(`zeg maar, je credentials zijn '${credentialsman.token}'`);
-	}, [credentialsman]);
 
 	return <>
 		<h1>Goback</h1>

@@ -1,6 +1,7 @@
 import { useContext, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom";
 import { AuthContext, type AuthContextProperties } from "../components/AuthContext";
+import { Alert, Button, Form } from "react-bootstrap";
 
 
 
@@ -33,14 +34,20 @@ export default function LoginPage() {
 
 
 	return <>
-		{status.length > 0 ? <p>{status}</p> : null}
-		<form onSubmit={onSubmitForm}>
-			<p>Email:</p>
-			<input type="text" onChange={(e) => setemail(e.target.value)} required />
-			<p>Password:</p>
-			<input type="password" onChange={(e) => setpassword(e.target.value)} required />
-			<button type="submit">Log in</button>
-		</form>
+		{status.length > 0 ? <Alert variant="warning">{status}</Alert> : null}
+		<div className="d-flex justify-content-center align-items-center vh-100">
+			<Form onSubmit={onSubmitForm}>
+				<Form.Group>
+					<Form.Label>Email Address: </Form.Label>
+					<Form.Control type="text" onChange={(e) => setemail(e.target.value)} placeholder="Email here" required />
+				</Form.Group>
+				<Form.Group>
+					<Form.Label>Password: </Form.Label>
+					<Form.Control type="password" onChange={(e) => setpassword(e.target.value)} placeholder="Your super secret password here: " required />
+				</Form.Group>
+				<Button variant="primary" type="submit">Log in</Button>
+			</Form>
+		</div>
 	</>
-
 }
+

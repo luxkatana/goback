@@ -1,6 +1,7 @@
 import { useContext, useState, type FormEvent } from "react";
 import { AuthContext } from "../components/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { Button, Form } from "react-bootstrap";
 
 export default function SignupPage() {
 	const [username, setusername] = useState("");
@@ -39,22 +40,26 @@ export default function SignupPage() {
 	};
 	return <>
 		{errors.length > 0 ? <h2>{errors}</h2> : null}
-		<h1>Sign up</h1>
-		<form onSubmit={FormCallback}>
-			<div>
-				<label htmlFor="username">Username (4-10 characters)</label>
-				<input id="username" min={4} max={10} type="text" onChange={(new_value) => setusername(new_value.target.value)} name="username" />
-			</div>
-			<div>
-				<label htmlFor="email">Email</label>
-				<input id="email" max={254} type="email" onChange={(new_value) => setemail(new_value.target.value)} name="email" />
-			</div>
-			<div>
-				<label htmlFor="password">Password (must have at least 8 characters)</label>
-				<input id="password" max={210} min={8} type="password" onChange={(new_value) => setpassword(new_value.target.value)} name="password" />
-			</div>
-			<button type="submit">Sign up!!</button>
-		</form>
+		<div className="d-flex justify-content-center" style={{ marginTop: "20px" }}>
+			<h1>Sign up</h1>
+		</div>
+		<div className="d-flex justify-content-center align-items-center vh-100">
+			<Form onSubmit={FormCallback}>
+				<Form.Group>
+					<Form.Label>Username (4-10 characters)</Form.Label>
+					<Form.Control min={4} max={10} type="text" onChange={(new_value) => setusername(new_value.target.value)} name="username" />
+				</Form.Group>
+				<Form.Group>
+					<Form.Label>Email</Form.Label>
+					<Form.Control max={254} type="email" onChange={(new_value) => setemail(new_value.target.value)} name="email" />
+				</Form.Group>
+				<Form.Group>
+					<Form.Label>Password (must have at least 8 characters)</Form.Label>
+					<Form.Control max={210} min={8} type="password" onChange={(new_value) => setpassword(new_value.target.value)} name="password" />
+				</Form.Group>
+				<Button variant="primary" type="submit">Sign up!!</Button>
+			</Form>
+		</div>
 
 	</>
 
