@@ -47,7 +47,7 @@ try:
         ...
     app.config["SQLALCHEMY_DATABASE_URI"] = conf_holder.sqlalchemy_connection_uri
 except Exception as e:
-    if conf_holder.use_sqlite_memory_as_fallback_option is True:
+    if conf_holder.use_sqlite_as_fallback_option is True:
         print(
             "WARNING: using sqlite memory as fallback option, main db choice gave error: ",
             e,

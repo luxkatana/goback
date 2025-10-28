@@ -25,9 +25,7 @@ def extract_db_uri(config_holder: ConfigurationHolder) -> dict[str, str]:
     username = url.username
     password = url.password
     database = url.path[1::]
-    return dict(
-        host=host, port=port, username=username, password=password, database=database
-    )
+    return dict(host=host, port=port, user=username, password=password, db=database)
 
 
 def get_tomllib_config() -> tuple[bool, ConfigurationHolder | str | Exception]:
