@@ -1,5 +1,4 @@
 import aiomysql
-from extensions import db
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
 import hashlib
@@ -12,9 +11,18 @@ from appwrite_session import (
 )
 from urllib.parse import urlparse
 from dotenv import load_dotenv
-import asyncio, bs4, httpx, os
+import asyncio, bs4, httpx
 
 from models import JobTask, User
+from config_manager import get_tomllib_config, ConfigurationHolder
+
+success, correspondingval = get_tomllib_config()
+if not success:
+    print(f"ERROR: while parsing toml gave error: {correspondingval}")
+    exit(1)
+
+conf_holder: ConfigurationHolder = correspondingval
+
 
 load_dotenv()
 URL_TAGS = frozenset(("href", "src"))
@@ -31,8 +39,8 @@ def findcorresponding_mimetype(element: PageElement) -> str:
     return "any"
 
 
-APPWRITE_KEY = os.getenv("APPWRITE_KEY")
-HOST_WEBSERVER_URL = os.getenv("GOBACK_MEDIA_URL")
+APPWRITE_KEY = conf_holder.api_key
+HOST_WEBSERVER_URL = conf_holder.media_url
 INTERACTIVE_MODE = __name__ == "__main__"
 
 

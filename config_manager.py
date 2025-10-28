@@ -2,10 +2,12 @@ import tomllib
 from urllib.parse import urlparse
 from typing import NamedTuple
 
+# TODO: get rid of the aiomysql module, and use sqlalchemy
+
 
 class ConfigurationHolder(NamedTuple):
     sqlalchemy_connection_uri: str
-    use_sqlite_memory_as_fallback_option: bool
+    use_sqlite_as_fallback_option: bool
     api_key: str
     endpoint_url: str
     project_id: str

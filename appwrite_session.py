@@ -1,24 +1,26 @@
 from dotenv import load_dotenv
-from os import environ
 from hashlib import md5, sha256
 from io import BytesIO
+from config_manager import get_tomllib_config, extract_db_uri
 import aiomysql
 import httpx
 
+success, holder = get_tomllib_config()
+if success is False:
+    print(f"Check your goback.toml file: {holder}")
+    exit(1)
+
 load_dotenv()
-APPWRITE_API_KEY = environ["APPWRITE_KEY"]
-APPWRITE_ENDPOINT = environ["APPWRITE_ENDPOINT"]
-APPWRITE_PROJECT_ID = environ["APPWRITE_PROJECT_ID"]
-APPWRITE_STORAGE_BUCKET_ID = environ["APPWRITE_STORAGE_BUCKET_ID"]
-MYSQL_HOST: str = environ["MYSQL_HOST"]
-MYSQL_USER: str = environ["MYSQL_USER"]
-MYSQL_PASS: str = environ["MYSQL_PASSWORD"]
-MYSQL_DB: str = environ["MYSQL_DB"]
-MYSQL_CREDS_TUPLE: tuple[str, ...] = (MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DB)
+APPWRITE_API_KEY = holder.api_key
+APPWRITE_ENDPOINT = holder.endpoint_url
+APPWRITE_PROJECT_ID = holder.project_id
+APPWRITE_STORAGE_BUCKET_ID = holder.storage_bucket_id
+
+mysql_credentials = extract_db_uri(holder)
 
 
 async def insert_site_row(site_url: str, document_file_id: str, user_id: int = -1):
-    async with aiomysql.connect(*MYSQL_CREDS_TUPLE) as connection:
+    async with aiomysql.connect(**mysql_credentials) as connection:
         async with connection.cursor() as cursor:
             cursor: aiomysql.Cursor
             await cursor.execute(
@@ -52,7 +54,7 @@ class SavedFile:
 class AppwriteSession:
     async def __aenter__(self):
         self.mysql_conn: aiomysql.Connection = await aiomysql.connect(
-            *MYSQL_CREDS_TUPLE
+            **mysql_credentials
         )
         self.httpx_client = httpx.AsyncClient(
             headers={

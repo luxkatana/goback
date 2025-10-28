@@ -1,6 +1,6 @@
 [database]
-sqlalchemy_connection_uri = "pymysql+mysql://luxkatana:password123@192.168.1.200/mydb" # URI that contains your database credentials (e.g mysql://luxkatana:password1234@192.168.1.200:3306/mydatabase)
-use_sqlite_memory_as_fallback_option = true # use sqlite memory as fallback option, in case sqlalchemy_connection_uri is invalid, otherwise it'll return an error
+sqlalchemy_connection_uri = "somethin" # URI that contains your database credentials (e.g mysql://luxkatana:password1234@192.168.1.200:3306/mydatabase)
+use_sqlite_as_fallback_option = true # use sqlite memory as fallback option, in case sqlalchemy_connection_uri is invalid, otherwise it'll return an error
 [appwrite-secrets]
 api_key = "" # usually starts with standard_
 endpoint_url = "" # Endpoint that goback should request to for goback

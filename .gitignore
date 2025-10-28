@@ -21,3 +21,4 @@
 /goback-frontend/*.njsproj
 /goback-frontend/*.sln
 /goback-frontend/*.sw?
+#/goback.toml

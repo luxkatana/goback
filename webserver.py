@@ -13,6 +13,7 @@ from flask import (
 )
 from flask_cors import CORS
 from httpx import HTTPStatusError
+from sqlalchemy import create_engine
 from scraper import main as scrape_site
 from flask_jwt_extended import (
     JWTManager,
@@ -21,22 +22,41 @@ from flask_jwt_extended import (
     jwt_required,
 )
 from extensions import db
-from dotenv import load_dotenv
-from os import environ, getenv
 from appwrite_session import AppwriteSession
 from models import JobTask, User
+from config_manager import ConfigurationHolder, get_tomllib_config
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
-load_dotenv()
+success, correspondingval = get_tomllib_config()
+if not success:
+    print(f"ERROR: while parsing toml gave error: {correspondingval}")
+    exit(1)
+
+conf_holder: ConfigurationHolder = correspondingval
 
 
 app = Flask(__name__)
 CORS(app)
-app.config["SQLALCHEMY_DATABASE_URI"] = environ["MYSQL_CONNECTION_STRING"]
 app.secret_key = secrets.token_urlsafe(40)
 app.config["JWT_SECRET_KEY"] = secrets.token_urlsafe(40)
 jwt = JWTManager(app)
+
+try:
+    with create_engine(conf_holder.sqlalchemy_connection_uri).connect() as _:
+        ...
+    app.config["SQLALCHEMY_DATABASE_URI"] = conf_holder.sqlalchemy_connection_uri
+except Exception as e:
+    if conf_holder.use_sqlite_memory_as_fallback_option is True:
+        print(
+            "WARNING: using sqlite memory as fallback option, main db choice gave error: ",
+            e,
+        )
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+        print(app.config["SQLALCHEMY_DATABASE_URI"])
+    else:
+        raise e
+
 
 db.init_app(app)
 with app.app_context():
@@ -177,8 +197,9 @@ async def get_media(file_id: str):
 
 
 if __name__ == "__main__":
-    WEBSERVER_HOST = getenv("WEBSERVER_HOST")
-    WEBSERVER_PORT = getenv("WEBSERVER_PORT")
-    DEBUG_MODE = getenv("FLASK_DEBUG_MODE", "").lower() in {"yes", "y"}
 
-    app.run(host=WEBSERVER_HOST, port=WEBSERVER_PORT, debug=DEBUG_MODE)
+    app.run(
+        host=conf_holder.webserver_host,
+        port=conf_holder.webserver_port,
+        debug=conf_holder.debug_mode,
+    )
