@@ -1,21 +1,24 @@
 import tomllib
 from urllib.parse import urlparse
-from typing import NamedTuple
+from typing import Any
 
 # TODO: get rid of the aiomysql module, and use sqlalchemy
 
 
-class ConfigurationHolder(NamedTuple):
-    sqlalchemy_connection_uri: str
-    use_sqlite_as_fallback_option: bool
-    api_key: str
-    endpoint_url: str
-    project_id: str
-    storage_bucket_id: str
-    webserver_host: str
-    webserver_port: int
-    debug_mode: bool
-    media_url: str
+class ConfigurationHolder:
+
+    def __init__(self, **kwargs) -> None:
+        object.__setattr__(self, "objects", kwargs)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "objects":
+            return object.__setattr__(self, name, value)
+        self.objects[name] = value
+
+    def __getattribute__(self, name: str) -> Any | None:
+        if name == "objects":
+            return object.__getattribute__(self, name)
+        return self.objects.get(name, None)
 
 
 def extract_db_uri(config_holder: ConfigurationHolder) -> dict[str, str]:
@@ -29,16 +32,16 @@ def extract_db_uri(config_holder: ConfigurationHolder) -> dict[str, str]:
 
 
 def get_tomllib_config() -> tuple[bool, ConfigurationHolder | str | Exception]:
-    valid_form: dict[str] = {}
+    config_holder = ConfigurationHolder()
     with open("./goback.toml", "rb") as file:
         configuration = tomllib.load(file)
 
     for sections in configuration.values():
         for inner_key in sections:
             inner_val = sections[inner_key]
-            valid_form[inner_key] = inner_val
+            setattr(config_holder, inner_key, inner_val)
     try:
-        return (True, ConfigurationHolder(**valid_form))
+        return (True, config_holder)
     except TypeError:
         return (
             False,
@@ -51,4 +54,4 @@ def get_tomllib_config() -> tuple[bool, ConfigurationHolder | str | Exception]:
 
 if __name__ == "__main__":
     _, holder = get_tomllib_config()
-    print(extract_db_uri(holder))
+    print(holder.objects)

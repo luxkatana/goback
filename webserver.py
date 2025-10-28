@@ -37,9 +37,11 @@ conf_holder: ConfigurationHolder = correspondingval
 
 
 app = Flask(__name__)
+app.instance_path = "."
 CORS(app)
 app.secret_key = secrets.token_urlsafe(40)
 app.config["JWT_SECRET_KEY"] = secrets.token_urlsafe(40)
+
 jwt = JWTManager(app)
 
 try:
@@ -49,11 +51,14 @@ try:
 except Exception as e:
     if conf_holder.use_sqlite_as_fallback_option is True:
         print(
-            "WARNING: using sqlite memory as fallback option, main db choice gave error: ",
+            "WARNING: using sqlite as fallback option, main db choice gave error: ",
             e,
         )
-        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
-        print(app.config["SQLALCHEMY_DATABASE_URI"])
+        if (sqlite_fp := conf_holder.sqlite_fallback_filepath) is None:
+            print("ERROR: goback.toml sqlite_fallback_path is not configured (empty)")
+            exit(1)
+
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_fp}"
     else:
         raise e
 
