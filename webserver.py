@@ -1,199 +1,154 @@
 import asyncio
 from typing import Annotated
-from fastapi import Depends, FastAPI
-from pydantic import BaseModel
-from datetime import datetime
+from fastapi import Depends, FastAPI, HTTPException, Path, status, Response
+import jwt
+import datetime
 from threading import Thread
-import email_validator
-import aiomysql
-import secrets
-from flask import (
-    jsonify,
-    make_response,
-    Response,
-    request,
-)
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from httpx import HTTPStatusError
-from sqlalchemy import create_engine
+from pydantic import BaseModel, EmailStr, Field
+from sqlmodel import Session, select
 from scraper import main as scrape_site
-from flask_jwt_extended import (
-    create_access_token,
-    get_jwt_identity,
-    jwt_required,
-)
-from extensions import db
 from appwrite_session import AppwriteSession
-from models import JobTask, User
+from models import SECRET_KEY, AssetMetadata, JobTask, User, get_db_session, hasher
 from config_manager import ConfigurationHolder, get_tomllib_config
-from werkzeug.security import check_password_hash, generate_password_hash
 
-
-
-conf_holder: ConfigurationHolder = get_tomllib_config()[1]
+conf_holder: ConfigurationHolder = get_tomllib_config()
 
 app = FastAPI()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api")
-
-try:
-    with create_engine(conf_holder.sqlalchemy_connection_uri).connect() as _:
-        ...
-    app.config["SQLALCHEMY_DATABASE_URI"] = conf_holder.sqlalchemy_connection_uri
-except Exception as e:
-    if conf_holder.use_sqlite_as_fallback_option is True:
-        print(
-            "WARNING: using sqlite as fallback option, main db choice gave error: ",
-            e,
-        )
-        if (sqlite_fp := conf_holder.sqlite_fallback_filepath) is None:
-            print("ERROR: goback.toml sqlite_fallback_path is not configured (empty)")
-            exit(1)
-
-        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_fp}"
-    else:
-        raise e
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
+db_annotated = Annotated[Session, Depends(get_db_session)]
 
 
-class LoginCredentials(BaseModel):
-    email: str
-    password: str
+async def get_user(
+    token: Annotated[str, Depends(oauth2_scheme)], db: db_annotated
+) -> User:
+    jwt_decoded = jwt.decode(token, SECRET_KEY, "HS256")
+    username = jwt_decoded["sub"]
+    return db.exec(select(User).where(User.username == username)).first()
 
 
-@app.post("/api/login")
-async def login(credentials: LoginCredentials) -> Response:
-    email = credentials.email
+user_annotated = Annotated[User, Depends(get_user)]
+
+
+@app.post("/api/login", status_code=status.HTTP_200_OK)
+async def login(
+    credentials: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_annotated
+):
+    username = credentials.username
     password = credentials.password
-    if email and password:
-        corresponding_user = db.session.query(User).where(User.email == email).first()
-        if (
-            corresponding_user is not None
-            and check_password_hash(corresponding_user.password, password) is True
-        ):
-            access_token = create_access_token(email)
-            return jsonify(access_token=access_token)
-        else:
-            return {"msg": "Bad credentials", "err": 1}
+    corresponding_user = db.exec(select(User).where(User.username == username)).first()
+    if (
+        corresponding_user is not None
+        and hasher.verify(password, corresponding_user.password) is True
+    ):
+        access_token = jwt.encode(
+            {
+                "sub": username,
+                "exp": datetime.datetime.now(datetime.timezone.utc)
+                + datetime.timedelta(days=10),
+            },
+            SECRET_KEY,
+            "HS256",
+        )
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    raise HTTPException(401, detail="credentials are invalid")
 
 
-@app.get("/api/job")
-@jwt_required()
-async def job_status_route(job_id: str, token: Annotated[str, Depends[oauth2_scheme]]) -> Response:
-    usr_email: str = get_jwt_identity()
-    user_id = db.session.query(User).where(User.email == usr_email).first().user_id
-    jobtask = (
-        db.session.query(JobTask)
-        .where(JobTask.user_id == user_id, JobTask.job_id == job_id)
-        .first()
-    )
+@app.get("/api/job", status_code=status.HTTP_200_OK)
+async def job_status_route(job_id: int, user: user_annotated, db: db_annotated):
+    jobtask = db.exec(
+        select(JobTask).where(JobTask.user_id == user.user_id, JobTask.job_id == job_id)
+    ).first()
     if jobtask is None:
-        return dict(error=1, msg=f"There is no jobtask with id {job_id}")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Jobtask not found")
 
-    return dict(jobtask.as_dict())
-
-
-def task_handler(user_id: int, job_id: int, url: str):
-    with app.app_context():
-        user = db.session.query(User).where(User.user_id == user_id).first()
-        job = db.session.query(JobTask).where(JobTask.job_id == job_id).first()
-        try:
-            file_id = asyncio.run(scrape_site(url, user, job))
-        except HTTPStatusError as e:
-            if e.request.url == url:
-                job.change_status(
-                    f"requested URL host sent error code {e.response.status_code}"
-                )
-            else:
-                job.change_status(
-                    f"Asset of requested URL has sent error code {e.response.status_code}"
-                )
-        except Exception as e:
-            job.change_status(str(e))
-        else:
-            job.change_status(f"Success: {file_id}")
-        print("Finished")
-        print(job.status)
-        # db.session.add(job)
-        db.session.commit()
+    return jobtask
 
 
-@app.post("/api/scrape")
-@jwt_required()
-async def scrape_site_route() -> Response:
-    user = db.session.query(User).where(User.email == get_jwt_identity()).first()
-    json_payload = request.get_json()
-    url = json_payload.get("url")
-    if not url:
-        return jsonify(error=1, msg="URL is missing")
-
-    new_job = JobTask(user_id=user.user_id, created_at=datetime.now())
-    db.session.add(new_job)
-    db.session.commit()
-
-    Thread(target=task_handler, args=(user.user_id, new_job.job_id, url)).start()
-
-    return jsonify(
-        msg="Created and accepted (is running as bg task)", job_task_id=new_job.job_id
-    )
-
-
-@app.post("/api/signup")
-async def signup() -> Response:
-    json_payload = request.get_json()
-    email = json_payload.get("email")
-    password = json_payload.get("password")
-    username = json_payload.get("username")
-    if db.session.query(User).where(User.email == email).first() is not None:
-        return jsonify(error=1, msg="Email exists, use another email")
-
-    if len(username) >= 10:
-        return jsonify(error=2, msg="Username should be max 10 characters")
-    elif len(password) >= 210:
-        return jsonify(error=3, msg="Password should be max 210 characters")
-    elif len(email) >= 254:
-        return jsonify(error=4, msg="Email should be max 254 characters")
+def task_handler(user_id: int, job_id: int, url: str, db: Session):
+    user = db.exec(select(User).where(User.user_id == user_id)).first()
+    job = db.exec(select(JobTask).where(JobTask.job_id == job_id)).first()
     try:
-        email_validator.validate_email(email)
-    except email_validator.EmailNotValidError:
-        return jsonify(error=5, msg="Email is not valid")
-
-    hashed_password = generate_password_hash(password)
-    newuser = User(username=username, password=hashed_password, email=email)
-    db.session.add(newuser)
-    db.session.commit()
-    access_token = create_access_token(email)
-    return jsonify(created=True, access_token=access_token)
-
-
-@app.get("/media/<string:file_id>")
-async def get_media(file_id: str):
-    if len(file_id) != 32:  # Is een md5 hash, en die heeft altijd 32 karakters
-        return "Invalid file id"
-
-    async with AppwriteSession() as session:
-        file_fetch_response = await session.get_file_content(file_id)
-        response_object = make_response(file_fetch_response)
-
-        async with session.mysql_conn.cursor() as cursor:
-            cursor: aiomysql.Cursor
-            await cursor.execute(
-                "SELECT mimetype FROM goback_assets_metadata WHERE file_id = %s;",
-                (file_id,),
+        file_id = asyncio.run(scrape_site(url, user, job))
+    except HTTPStatusError as e:
+        if e.request.url == url:
+            job.change_status(
+                f"requested URL host sent error code {e.response.status_code}"
             )
-            result = tuple(await cursor.fetchall())
-            if (
-                len(result) == 0 or (inner_str := result[0][0]) == "any"
-            ):  # Assume its just a text/plain
-                response_object.content_type = "text/html"
-            else:
-                response_object.content_type = inner_str
+        else:
+            job.change_status(
+                f"Asset of requested URL has sent error code {e.response.status_code}"
+            )
+    except Exception as e:
+        job.change_status(str(e))
+    else:
+        job.change_status(f"Success: {file_id}")
+    db.commit()
+
+
+@app.post("/api/scrape", status_code=status.HTTP_202_ACCEPTED)
+async def scrape_site_route(
+    db: db_annotated, user: user_annotated, url: str
+):  # TODO: url regex
+    new_job = JobTask(user_id=user.user_id, created_at=datetime.datetime.now())
+    db.add(new_job)
+    db.commit()
+
+    return Thread(
+        target=task_handler, args=(user.user_id, new_job.job_id, url, db)
+    ).start()
+
+
+class SignupCredentials(BaseModel):
+    username: str = Field(max_length=30)
+    password: str = Field(max_length=30, min_length=8)
+    email: EmailStr = Field(max_length=255)
+
+
+@app.post("/api/signup", status_code=status.HTTP_201_CREATED)
+async def signup(db: db_annotated, signupcreds: SignupCredentials):
+    email = signupcreds.email
+    password = signupcreds.password
+    username = signupcreds.username
+    if db.exec(select(User).where(User.username == username)).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username exists"
+        )
+
+    hashed_password = hasher.hash(password)
+    newuser = User(username=username, password=hashed_password, email=email)
+    db.add(newuser)
+    db.commit()
+    access_token = jwt.encode(
+        {
+            "sub": username,
+            "exp": datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(days=10),
+        },
+        SECRET_KEY,
+        "HS256",
+    )
+    return {"access_token": access_token}
+
+
+@app.get("/media/{file_id}")
+async def get_media(
+    file_id: Annotated[str, Path(max_length=32, min_length=32)], db: db_annotated
+):
+    async with AppwriteSession() as session:
+        file_fetch_response = await session.get_file_content(
+            file_id
+        )  # A fallback if it doesn't exist
+        response_object = Response(file_fetch_response)
+        result: AssetMetadata = db.exec(
+            select(AssetMetadata).where(AssetMetadata.file_id == file_id)
+        ).first()
+
+        if result is None or result.mimetype == "any":  # Assume its just a text/plain
+            response_object.media_type = "text/html"
+        else:
+            response_object.media_type = result.mimetype
 
     return response_object
-
-
-if __name__ == "__main__":
-
-    app.run(
-        host=conf_holder.webserver_host,
-        port=conf_holder.webserver_port,
-        debug=conf_holder.debug_mode,
-    )

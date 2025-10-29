@@ -1,7 +1,8 @@
-import aiomysql
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
 import hashlib
+
+from sqlmodel import Session, select
 from appwrite_session import (
     AppwriteSession,
     create_file_identifier,
@@ -10,22 +11,29 @@ from appwrite_session import (
     APPWRITE_STORAGE_BUCKET_ID,
 )
 from urllib.parse import urlparse
-from dotenv import load_dotenv
 import asyncio, bs4, httpx
 
-from models import JobTask, User
+from models import AssetMetadata, JobTask, User, db_engine
 from config_manager import get_tomllib_config, ConfigurationHolder
 
-success, correspondingval = get_tomllib_config()
-if not success:
-    print(f"ERROR: while parsing toml gave error: {correspondingval}")
-    exit(1)
-
-conf_holder: ConfigurationHolder = correspondingval
-
-
-load_dotenv()
+conf_holder: ConfigurationHolder = get_tomllib_config()
 URL_TAGS = frozenset(("href", "src"))
+
+
+def prepare_dummy_user() -> User:
+    with Session(db_engine) as session:
+        usr = session.exec(select(User).where(User.user_id == -1)).first()  # Guest id
+        if usr is not None:
+            return usr
+        guestusr = User(
+            user_id=-1,
+            username="Guest user DO NOT DELETE",
+            password="iamaguest!!!",
+            email="someguests@luxkatana.eu",
+        )
+        session.add(guestusr)
+        session.commit()
+        return guestusr
 
 
 def findcorresponding_mimetype(element: PageElement) -> str:
@@ -129,6 +137,7 @@ async def main(
 ) -> str:
     dprint("TASK STARTED")
     scraper = GobackScraper(url)
+    prepare_dummy_user()
     await scraper.load_html()
 
     useful_element = await scraper.walk_through_native()
@@ -202,13 +211,13 @@ async def main(
                 element.attrs[key] = (
                     f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
                 )
-                async with session.mysql_conn.cursor() as cursor:
-                    cursor: aiomysql.Cursor
-                    await cursor.execute(
-                        "INSERT INTO goback_assets_metadata (file_id, mimetype) VALUES (%s, %s)",
-                        (savedfile.appwrite_file_id, mimetype),
+                with Session(db_engine) as db_session:
+                    new_asset = AssetMetadata(
+                        file_id=savedfile.appwrite_file_id, mimetype=mimetype
                     )
-                    await session.mysql_conn.commit()
+                    db_session.add(new_asset)
+                    db_session.commit()
+
         site_document_indentifier = create_file_identifier(
             str(scraper.main_html_content), url
         )

@@ -1,9 +1,8 @@
-Flask[async]
 beautifulsoup4
-python-dotenv
+fastapi
 httpx
 lxml
-aiomysql
-sqlalchemy
-Flask-sqlalchemy
+pwdlib
 PyJWT
+SQLmodel
+email-validator

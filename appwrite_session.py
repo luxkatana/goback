@@ -1,34 +1,26 @@
-from dotenv import load_dotenv
 from hashlib import md5, sha256
 from io import BytesIO
-from config_manager import get_tomllib_config, extract_db_uri
-import aiomysql
+
+from sqlmodel import Session
+from models import SitesMetadata, db_engine
+from config_manager import get_tomllib_config
 import httpx
 
-success, holder = get_tomllib_config()
-if success is False:
-    print(f"Check your goback.toml file: {holder}")
-    exit(1)
+holder = get_tomllib_config()
 
-load_dotenv()
 APPWRITE_API_KEY = holder.api_key
 APPWRITE_ENDPOINT = holder.endpoint_url
 APPWRITE_PROJECT_ID = holder.project_id
 APPWRITE_STORAGE_BUCKET_ID = holder.storage_bucket_id
 
-mysql_credentials = extract_db_uri(holder)
-
 
 async def insert_site_row(site_url: str, document_file_id: str, user_id: int = -1):
-    async with aiomysql.connect(**mysql_credentials) as connection:
-        async with connection.cursor() as cursor:
-            cursor: aiomysql.Cursor
-            await cursor.execute(
-                "INSERT INTO goback_sites_metadata (site_url, document_file_id, user_id) VALUES (%s,%s,%s)",
-                (site_url, document_file_id, user_id),
-            )
-
-            await connection.commit()
+    with Session(db_engine) as db_session:
+        new_metadata = SitesMetadata(
+            site_url=site_url, document_file_id=document_file_id, user_id=user_id
+        )
+        db_session.add(new_metadata)
+        db_session.commit()
 
 
 def create_file_identifier(file_content: str, host_url: str) -> str:
@@ -53,9 +45,6 @@ class SavedFile:
 
 class AppwriteSession:
     async def __aenter__(self):
-        self.mysql_conn: aiomysql.Connection = await aiomysql.connect(
-            **mysql_credentials
-        )
         self.httpx_client = httpx.AsyncClient(
             headers={
                 "X-Appwrite-Project": APPWRITE_PROJECT_ID,
@@ -65,8 +54,6 @@ class AppwriteSession:
         return self
 
     async def __aexit__(self, *_):
-        if self.mysql_conn is not None:
-            self.mysql_conn.close()
         if self.httpx_client is not None:
             await self.httpx_client.aclose()
 

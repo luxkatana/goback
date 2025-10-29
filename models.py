@@ -1,32 +1,76 @@
-from flask_login import UserMixin
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
-from extensions import db
+from datetime import datetime
+from secrets import randbits
+from sqlmodel import SQLModel, Field, Session, create_engine
+from pwdlib import PasswordHash
+from config_manager import (
+    ConfigurationHolder,
+    get_tomllib_config,
+    get_working_database_string,
+)
+
+SECRET_KEY = "".join([chr(randbits(8)) for _ in range(50)])
+hasher = PasswordHash.recommended()
+
+conf_holder: ConfigurationHolder = get_tomllib_config()
+
+db_string = get_working_database_string(conf_holder)
+
+db_engine = create_engine(db_string)
 
 
-class User(db.Model, UserMixin):
+def get_db_session():
+    try:
+        with Session(db_engine) as session:
+            yield session
+
+    finally:
+        session.close()
+
+
+def setup_tables():
+    SQLModel.metadata.drop_all(db_engine)
+    SQLModel.metadata.create_all(db_engine)
+
+
+class User(SQLModel, table=True):
     __tablename__ = "goback_users"
-    user_id = Column(Integer, primary_key=True)
-
-    username = Column(String(10), nullable=False, unique=False)
-    email = Column(String(254), nullable=False, unique=True)
-    password = Column(String(210), nullable=False, unique=False)
+    user_id: int | None = Field(primary_key=True)
+    username: str
+    email: str
+    password: str
 
     def __repr__(self) -> str:
         return f"User({self.user_id},{self.username},{self.email},{self.password})"
 
-    def get_id(self) -> str:
-        return str(self.user_id)
+
+class AssetMetadata(SQLModel, table=True):
+    __tablename__ = "goback_assets_metadata"
+    asset_id: int | None = Field(primary_key=True)
+    file_id: str = Field(nullable=False, max_length=38)
+    mimetype: str = Field(default="any")
 
 
-class JobTask(db.Model):
+class SitesMetadata(SQLModel, table=True):
+    __tablename__ = "goback_sites_metadata"
+    site_id: int | None = Field(primary_key=True)
+    user_id: int = Field(foreign_key="goback_users.user_id", default=-1)
+    site_url: str
+    document_file_id: str
+
+
+class JobTask(SQLModel, table=True):
     __tablename__ = "goback_job_tracker"
-    job_id = Column(Integer, primary_key=True, nullable=False)
-    user_id = Column(Integer, ForeignKey(User.user_id), nullable=False)
-    created_at = Column(DateTime, nullable=False)
-    status = Column(String(50), nullable=False, default="Working on")
+    job_id: int | None = Field(primary_key=True)
+    user_id: int = Field(nullable=False, foreign_key="goback_users.user_id")
+    created_at: datetime
+    status: str = Field(default="Working on")
 
     def change_status(self, new_status: str):
         self.status = new_status
 
     def as_dict(self) -> dict[str, str]:
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+if __name__ == "__main__":
+    setup_tables()

@@ -1,20 +1,17 @@
 [database]
-sqlalchemy_connection_uri = "" # URI that contains your database credentials (e.g mysql://luxkatana:password1234@192.168.1.200:3306/mydatabase)
-use_sqlite_as_fallback_option = true # use sqlite memory as fallback option, in case sqlalchemy_connection_uri is invalid, otherwise it'll return an error
-sqlite_fallback_filepath = "./goback.sqlite3" # sqlite database file in case the above field is true (This is for persistency)
+db_connection_string = "" # URI that contains your database credentials (e.g mysql://luxkatana:password1234@192.168.1.200:3306/mydatabase)
+use_sqlite_as_fallback_option = true # use sqlite memory as fallback option, in case db_connection_string fails
+sqlite_fallback_filepath = ":memory:" # sqlite database file-path in case the above field is true (or use :memory: for in-memory database which is not persistent)
+
 [appwrite-secrets]
 api_key = "" # usually starts with standard_
-endpoint_url = "" # Endpoint that goback should request to for goback
+endpoint_url = "https://fra.cloud.appwrite.io/v1" # Endpoint that goback should request to for appwrite
 project_id = "" 
 storage_bucket_id = ""
 
 
-[flask]
-webserver_host="0.0.0.0" 
-webserver_port=8000
-debug_mode = true # TODO: Change this ASAP to false
 [goback]
-media_url=""
+media_url="http://127.0.0.1:8000"
 #this is a very important configuration, "media_url" is the url that should be used to rewrite HTML assets in a document
 # Set it to an accessible domain such as http://127.0.0.1 or mydomain.com, it must be accessible from outside
 # change media_url to "http://127.0.0.1:8000" if you're running this in debug mode
