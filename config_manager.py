@@ -28,7 +28,7 @@ def get_working_database_string(
 ) -> str:
     main_uri = config.db_connection_string
     secondary_uri = config.sqlite_fallback_filepath
-    use_sqlite_as_second_option = config.use_sqlite_as_fallback_otpion
+    use_sqlite_as_second_option = config.use_sqlite_as_fallback_option
     try:
         engine = create_engine(main_uri)
         with engine.connect():
