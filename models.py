@@ -72,5 +72,6 @@ class JobTask(SQLModel, table=True):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
+SQLModel.metadata.create_all(db_engine)
 if __name__ == "__main__":
     setup_tables()

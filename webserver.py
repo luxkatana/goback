@@ -10,7 +10,15 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session, select
 from scraper import main as scrape_site
 from appwrite_session import AppwriteSession
-from models import SECRET_KEY, AssetMetadata, JobTask, User, get_db_session, hasher
+from models import (
+    SECRET_KEY,
+    AssetMetadata,
+    JobTask,
+    User,
+    get_db_session,
+    hasher,
+    db_engine,
+)
 from config_manager import ConfigurationHolder, get_tomllib_config
 
 conf_holder: ConfigurationHolder = get_tomllib_config()
@@ -67,25 +75,26 @@ async def job_status_route(job_id: int, user: user_annotated, db: db_annotated):
     return jobtask
 
 
-def task_handler(user_id: int, job_id: int, url: str, db: Session):
-    user = db.exec(select(User).where(User.user_id == user_id)).first()
-    job = db.exec(select(JobTask).where(JobTask.job_id == job_id)).first()
-    try:
-        file_id = asyncio.run(scrape_site(url, user, job))
-    except HTTPStatusError as e:
-        if e.request.url == url:
-            job.change_status(
-                f"requested URL host sent error code {e.response.status_code}"
-            )
+def task_handler(user_id: int, job_id: int, url: str):
+    with Session(db_engine) as db:
+        user = db.exec(select(User).where(User.user_id == user_id)).first()
+        job = db.exec(select(JobTask).where(JobTask.job_id == job_id)).first()
+        try:
+            file_id = asyncio.run(scrape_site(url, user, job))
+        except HTTPStatusError as e:
+            if e.request.url == url:
+                job.change_status(
+                    f"requested URL host sent error code {e.response.status_code}"
+                )
+            else:
+                job.change_status(
+                    f"Asset of requested URL has sent error code {e.response.status_code}"
+                )
+        except Exception as e:
+            job.change_status(str(e))
         else:
-            job.change_status(
-                f"Asset of requested URL has sent error code {e.response.status_code}"
-            )
-    except Exception as e:
-        job.change_status(str(e))
-    else:
-        job.change_status(f"Success: {file_id}")
-    db.commit()
+            job.change_status(f"Success: {file_id}")
+        db.commit()
 
 
 @app.post("/api/scrape", status_code=status.HTTP_202_ACCEPTED)
@@ -96,9 +105,8 @@ async def scrape_site_route(
     db.add(new_job)
     db.commit()
 
-    return Thread(
-        target=task_handler, args=(user.user_id, new_job.job_id, url, db)
-    ).start()
+    Thread(target=task_handler, args=(user.user_id, new_job.job_id, url)).start()
+    return {"job_id": new_job.job_id}
 
 
 class SignupCredentials(BaseModel):
