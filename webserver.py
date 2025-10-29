@@ -1,22 +1,23 @@
 import asyncio
+from typing import Annotated
+from fastapi import Depends, FastAPI
+from pydantic import BaseModel
 from datetime import datetime
 from threading import Thread
 import email_validator
 import aiomysql
 import secrets
 from flask import (
-    Flask,
     jsonify,
     make_response,
     Response,
     request,
 )
-from flask_cors import CORS
+from fastapi.security import OAuth2PasswordBearer
 from httpx import HTTPStatusError
 from sqlalchemy import create_engine
 from scraper import main as scrape_site
 from flask_jwt_extended import (
-    JWTManager,
     create_access_token,
     get_jwt_identity,
     jwt_required,
@@ -28,21 +29,11 @@ from config_manager import ConfigurationHolder, get_tomllib_config
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
-success, correspondingval = get_tomllib_config()
-if not success:
-    print(f"ERROR: while parsing toml gave error: {correspondingval}")
-    exit(1)
 
-conf_holder: ConfigurationHolder = correspondingval
+conf_holder: ConfigurationHolder = get_tomllib_config()[1]
 
-
-app = Flask(__name__)
-app.instance_path = "."
-CORS(app)
-app.secret_key = secrets.token_urlsafe(40)
-app.config["JWT_SECRET_KEY"] = secrets.token_urlsafe(40)
-
-jwt = JWTManager(app)
+app = FastAPI()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api")
 
 try:
     with create_engine(conf_holder.sqlalchemy_connection_uri).connect() as _:
@@ -63,16 +54,15 @@ except Exception as e:
         raise e
 
 
-db.init_app(app)
-with app.app_context():
-    db.create_all()
+class LoginCredentials(BaseModel):
+    email: str
+    password: str
 
 
 @app.post("/api/login")
-async def login() -> Response:
-    json_payload = request.get_json()
-    email = json_payload.get("email")
-    password = json_payload.get("password")
+async def login(credentials: LoginCredentials) -> Response:
+    email = credentials.email
+    password = credentials.password
     if email and password:
         corresponding_user = db.session.query(User).where(User.email == email).first()
         if (
@@ -82,14 +72,12 @@ async def login() -> Response:
             access_token = create_access_token(email)
             return jsonify(access_token=access_token)
         else:
-            return jsonify(error=2, msg="Bad credentials")
-
-    return jsonify(error=1, msg="email and password is missing")
+            return {"msg": "Bad credentials", "err": 1}
 
 
-@app.get("/api/job/<string:job_id>")
+@app.get("/api/job")
 @jwt_required()
-async def job_status_route(job_id: str) -> Response:
+async def job_status_route(job_id: str, token: Annotated[str, Depends[oauth2_scheme]]) -> Response:
     usr_email: str = get_jwt_identity()
     user_id = db.session.query(User).where(User.email == usr_email).first().user_id
     jobtask = (
@@ -98,8 +86,9 @@ async def job_status_route(job_id: str) -> Response:
         .first()
     )
     if jobtask is None:
-        return jsonify(error=1, msg=f"There is no jobtask with id {job_id}")
-    return jsonify(jobtask.as_dict())
+        return dict(error=1, msg=f"There is no jobtask with id {job_id}")
+
+    return dict(jobtask.as_dict())
 
 
 def task_handler(user_id: int, job_id: int, url: str):

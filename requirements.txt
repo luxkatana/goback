@@ -6,3 +6,4 @@ lxml
 aiomysql
 sqlalchemy
 Flask-sqlalchemy
+PyJWT
