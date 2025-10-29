@@ -1,5 +1,6 @@
 from io import BytesIO
 import tomllib
+from rich import print
 from sqlmodel import create_engine
 import httpx
 from typing import Any
@@ -37,8 +38,10 @@ def get_working_database_string(
     except Exception as e:
         if use_sqlite_as_second_option is True:
             if debug_info is True:
-                print(f"WARNING: main uri ({main_uri}) does not work ({e})")
-                print("-> Using sqlite as fallback option")
+                print(
+                    f"[yellow bold]WARNING[/yellow bold]: main uri ({main_uri}) does not work ({e})"
+                )
+                print("[white]-> Using sqlite as fallback option[/white]")
             return f"sqlite:///{secondary_uri}"
         raise e
 
@@ -54,7 +57,7 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
     storage_bucket_id = holder.storage_bucket_id
     if None in (endpoint_url, api_key, project_id, storage_bucket_id):
         print(
-            "ERROR: Missing some valid appwrite variables (possibly some info is missing, check the default template in the github repo)"
+            "[red bold]ERROR[/red bold]: Missing some valid appwrite variables (possibly some info is missing, check the default template in the github repo)"
         )
         exit(1)
 
@@ -70,18 +73,20 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
         # 409 already exists
         if response.status_code == 401:
             if response.json()["type"] == "user_unauthorized":
-                print("ERROR: API key is invalid (api_key field in goback.toml)")
+                print(
+                    "[red bold]ERROR[/red bold]: API key is invalid (api_key field in goback.toml)"
+                )
             elif response.json()["type"] == "general_unauthorized_scope":
                 print(
-                    "ERROR: missing scopes, make sure that the api key has the files.read and files.write scopes enabled"
+                    "[red bold]ERROR[/red bold]: missing scopes, make sure that the api key has the files.read and files.write scopes enabled"
                 )
 
             exit(1)
         if response.status_code == 404:
             if response.json()["type"] == "project_not_found":
-                print("ERROR: Project ID is invalid")
+                print("[red bold]ERROR[/red bold]: Project ID is invalid")
             elif response.json()["type"] == "storage_bucket_not_found":
-                print("ERROR: Storage bucket is invalid")
+                print("[red bold]ERROR[/red bold]: Storage bucket is invalid")
 
             exit(1)
 
@@ -94,7 +99,7 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
             and response.json()["type"] == "general_unauthorized_scope"
         ):
             print(
-                "ERROR: missing scopes, make sure that the api key has the files.read and files.write scopes enabled"
+                "[red bold]ERROR[/red bold]: missing scopes, make sure that the api key has the files.read and files.write scopes enabled"
             )
             exit(1)
 
@@ -102,7 +107,9 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
             f"{endpoint_url}/storage/buckets/{storage_bucket_id}/files/validationifcredentialsareok",
             headers=headers,
         ).raise_for_status()
-        print("Appwrite credentials validations passed")
+        print(
+            ":tada: Appwrite credentials validations passed :white_check_mark: :tada:"
+        )
 
 
 def get_tomllib_config() -> ConfigurationHolder:

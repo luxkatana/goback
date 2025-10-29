@@ -1,5 +1,6 @@
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
+from rich import print
 import hashlib
 
 from sqlmodel import Session, select
@@ -56,7 +57,7 @@ def dprint(*args, **kwargs) -> None:
     if INTERACTIVE_MODE:
         print(*args, **kwargs)
     else:
-        print(f"[FROM WEBSERVER DBG MESSAGES]", *args, **kwargs)
+        print(f"[blue bold][FROM WEBSERVER DBG MESSAGES][/blue bold]", *args, **kwargs)
 
 
 class GobackScraper:

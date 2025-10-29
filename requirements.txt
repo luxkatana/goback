@@ -6,3 +6,4 @@ pwdlib
 PyJWT
 SQLmodel
 email-validator
+rich
