@@ -1,6 +1,7 @@
+from io import BytesIO
 import tomllib
 from sqlmodel import create_engine
-from urllib.parse import urlparse
+import httpx
 from typing import Any
 
 
@@ -42,14 +43,66 @@ def get_working_database_string(
         raise e
 
 
-def extract_db_uri(config_holder: ConfigurationHolder) -> dict[str, str]:
-    url = urlparse(config_holder.db_connection_string)
-    host = url.hostname
-    port = url.port
-    username = url.username
-    password = url.password
-    database = url.path[1::]
-    return dict(host=host, port=port, user=username, password=password, db=database)
+def validate_appwrite_credentials(holder: ConfigurationHolder):
+    endpoint_url = holder.endpoint_url
+    api_key = holder.api_key
+    project_id = holder.project_id
+    headers = {
+        "X-Appwrite-Project": project_id,
+        "X-Appwrite-Key": api_key,
+    }
+    storage_bucket_id = holder.storage_bucket_id
+    if None in (endpoint_url, api_key, project_id, storage_bucket_id):
+        print(
+            "ERROR: Missing some valid appwrite variables (possibly some info is missing, check the default template in the github repo)"
+        )
+        exit(1)
+
+    with BytesIO() as io:
+        io.write(b"Validation success")
+        response = httpx.post(
+            f"{endpoint_url}/storage/buckets/{storage_bucket_id}/files",
+            headers=headers,
+            data={"fileId": "validationifcredentialsareok"},
+            files={"file": ("validationfile.txt", io, "text/plain")},
+        )
+        # 201 is what we should get
+        # 409 already exists
+        if response.status_code == 401:
+            if response.json()["type"] == "user_unauthorized":
+                print("ERROR: API key is invalid (api_key field in goback.toml)")
+            elif response.json()["type"] == "general_unauthorized_scope":
+                print(
+                    "ERROR: missing scopes, make sure that the api key has the files.read and files.write scopes enabled"
+                )
+
+            exit(1)
+        if response.status_code == 404:
+            if response.json()["type"] == "project_not_found":
+                print("ERROR: Project ID is invalid")
+            elif response.json()["type"] == "storage_bucket_not_found":
+                print("ERROR: Storage bucket is invalid")
+
+            exit(1)
+
+        response = httpx.get(
+            f"{endpoint_url}/storage/buckets/{storage_bucket_id}/files/validationifcredentialsareok/preview",
+            headers=headers,
+        )
+        if (
+            response.status_code == 401
+            and response.json()["type"] == "general_unauthorized_scope"
+        ):
+            print(
+                "ERROR: missing scopes, make sure that the api key has the files.read and files.write scopes enabled"
+            )
+            exit(1)
+
+        httpx.delete(
+            f"{endpoint_url}/storage/buckets/{storage_bucket_id}/files/validationifcredentialsareok",
+            headers=headers,
+        ).raise_for_status()
+        print("Appwrite credentials validations passed")
 
 
 def get_tomllib_config() -> ConfigurationHolder:
@@ -65,5 +118,6 @@ def get_tomllib_config() -> ConfigurationHolder:
 
 
 if __name__ == "__main__":
-    _, holder = get_tomllib_config()
-    print(holder.objects)
+    holder = get_tomllib_config()
+
+    (validate_appwrite_credentials(holder))

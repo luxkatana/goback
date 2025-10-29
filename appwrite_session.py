@@ -3,7 +3,7 @@ from io import BytesIO
 
 from sqlmodel import Session
 from models import SitesMetadata, db_engine
-from config_manager import get_tomllib_config
+from config_manager import get_tomllib_config, validate_appwrite_credentials
 import httpx
 
 holder = get_tomllib_config()
@@ -12,6 +12,7 @@ APPWRITE_API_KEY = holder.api_key
 APPWRITE_ENDPOINT = holder.endpoint_url
 APPWRITE_PROJECT_ID = holder.project_id
 APPWRITE_STORAGE_BUCKET_ID = holder.storage_bucket_id
+validate_appwrite_credentials(holder)
 
 
 async def insert_site_row(site_url: str, document_file_id: str, user_id: int = -1):

@@ -5,7 +5,7 @@ sqlite_fallback_filepath = "./_tempfile.db" # sqlite database file-path in case 
 
 [appwrite-secrets]
 api_key = "" # usually starts with standard_
-endpoint_url = "https://fra.cloud.appwrite.io/v1" # Endpoint that goback should request to for appwrite
+endpoint_url = "" # Endpoint that goback should request to for appwrite
 project_id = "" 
 storage_bucket_id = ""
 
