@@ -1,7 +1,7 @@
 import { Button, Field, Fieldset, Input, Link, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link as RLink } from "react-router-dom";
+import { Link as RLink, useLocation, useNavigate } from "react-router-dom";
 
 interface LoginFormInput {
 	username: string,
@@ -13,14 +13,17 @@ export default function Login() {
 	const { register, handleSubmit, formState: { errors, isValid } } = useForm<LoginFormInput>({
 		mode: "onChange",
 	});
+	const navigate = useNavigate();
 	const [loading, setLoading] = useState<boolean>(false);
+	const location = useLocation();
 	function SubmitCallback(formdata: LoginFormInput) {
-		// Validation  finished
-		console.log(loading);
 		if (loading == false) {
 			setLoading(true);
 			console.log(formdata);
-			//setLoading(false);
+			setLoading(false);
+			const search = new URLSearchParams(location.search);
+			const path = search.get("n");
+			navigate(path !== null ? path : "/dashboard");
 		}
 	}
 	return <>

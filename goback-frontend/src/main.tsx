@@ -5,12 +5,15 @@ import Home from './routes/Home'
 import Login from './routes/Login'
 import Signup from './routes/Signup'
 import { Provider } from './components/ui/provider'
+import Dashboard from "./routes/Dashboard";
+import ProtectedComponent from './components/ProtectedComponent'
 
 
 const router = createBrowserRouter([
 	{ path: "/", element: <Home /> },
 	{ path: "/login", element: <Login /> },
-	{ path: "/signup", element: <Signup /> }
+	{ path: "/signup", element: <Signup /> },
+	{ path: "/dashboard", element: <ProtectedComponent><Dashboard /></ProtectedComponent> }
 
 ])
 
