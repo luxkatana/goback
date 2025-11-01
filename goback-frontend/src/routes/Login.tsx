@@ -1,7 +1,9 @@
 import { Button, Field, Fieldset, Input, Link, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link as RLink, useLocation, useNavigate } from "react-router-dom";
+import { AuthContext, AuthenticateUser } from "../utils/AuthContext";
+import toast from "react-hot-toast";
 
 interface LoginFormInput {
 	username: string,
@@ -16,11 +18,17 @@ export default function Login() {
 	const navigate = useNavigate();
 	const [loading, setLoading] = useState<boolean>(false);
 	const location = useLocation();
-	function SubmitCallback(formdata: LoginFormInput) {
+	const auth_holder = useContext(AuthContext);
+	async function SubmitCallback(formdata: LoginFormInput) {
 		if (loading == false) {
 			setLoading(true);
-			console.log(formdata);
+			const ResponseStatus: boolean = await AuthenticateUser(formdata.username, formdata.password, auth_holder);
+			console.info(`Response status: ${ResponseStatus}`);
 			setLoading(false);
+			if (ResponseStatus == false) { // Authenticated
+				return toast.error("Credentials are incorrect :(");
+			}
+			toast("Logged in!");
 			const search = new URLSearchParams(location.search);
 			const path = search.get("n");
 			navigate(path !== null ? path : "/dashboard");

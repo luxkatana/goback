@@ -1,5 +1,5 @@
 import React, { createContext, useEffect, useState } from "react";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 
 export type AuthInfo = {
 	access_token: string | null,
@@ -14,16 +14,24 @@ const AxiosClient = axios.create({
 });
 
 
-async function AuthenticateUser(username: string, password: string) {
-	// TODO: Create custom hook?
-	const response = await AxiosClient.post("/api/login", {
-		"username": username,
-		"password": password,
-	});
-	if (response.status == 200) {
+export async function AuthenticateUser(username: string, password: string, context: AuthInfo) {
+	try {
+		const response = await AxiosClient.post("/api/login", {
+			"username": username,
+			"password": password,
+		}, {
+			headers: {
+				"Content-Type": "application/x-www-form-urlencoded"
+			}
 
+		});
+		context.set_access_token!(response.data.access_token);
+		context.setisValid!(true);
 		return true;
+	} catch (error: AxiosError | any) {
+		return false
 	}
+
 
 }
 
@@ -38,7 +46,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 				headers: {
 					"Authorization": `Bearer ${access_token}`
 				}
-			}).then((response) => setisValid(response.status == 204));
+			}).then(() => setisValid(true))
+				.catch(() => setisValid(false));
 
 		}
 	}, [access_token]);
