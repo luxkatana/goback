@@ -60,6 +60,24 @@ export async function AuthenticateUser(username: string, password: string, conte
 		return false
 	}
 }
+export async function CreateBackupCall(url: string, context: AuthInfo) {
+	try {
+		const response = await AxiosClient.post("/api/scrape", {
+			"url": url
+		}, {
+			headers: {
+				"Authorization": `Bearer ${context.access_token!}`
+			}
+		});
+
+
+	} catch (_: AxiosError | any) {
+		return false
+
+	}
+
+
+}
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [access_token, set_access_token] = useState<string | null>(() => localStorage.getItem("goback_access_token"));

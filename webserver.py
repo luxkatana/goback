@@ -6,7 +6,7 @@ import datetime
 from threading import Thread
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from httpx import HTTPStatusError
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, HttpUrl
 from sqlmodel import Session, select
 from fastapi.middleware.cors import CORSMiddleware
 from scraper import main as scrape_site
@@ -115,15 +115,21 @@ def task_handler(user_id: int, job_id: int, url: str):
         db.commit()
 
 
+class ScrapeUrlPayload(BaseModel):
+    url: HttpUrl = Field(max_length=100)
+
+
 @app.post("/api/scrape", status_code=status.HTTP_202_ACCEPTED)
 async def scrape_site_route(
-    db: db_annotated, user: user_annotated, url: str
+    db: db_annotated, user: user_annotated, url_payload: ScrapeUrlPayload
 ):  # TODO: url regex
     new_job = JobTask(user_id=user.user_id, created_at=datetime.datetime.now())
     db.add(new_job)
     db.commit()
 
-    Thread(target=task_handler, args=(user.user_id, new_job.job_id, url)).start()
+    Thread(
+        target=task_handler, args=(user.user_id, new_job.job_id, str(url_payload.url))
+    ).start()
     return {"job_id": new_job.job_id}
 
 
