@@ -9,11 +9,12 @@ export default function ProtectedComponent({ children }: { children: React.React
 	const location = useLocation();
 	const navigate = useNavigate();
 	useEffect(() => {
-		if (auth.isValid == false) {
+		if (auth.isValid === false && auth.loading === false) {
+			console.log(auth.isValid);
 			toast("Please login to continue")
 			navigate(`/login?n=${location.pathname}`);
 		}
-	}, [auth.isValid, navigate, location.pathname]);
+	}, [auth.isValid, navigate, location.pathname, auth.loading]);
 	return <>
 		{children}
 	</>

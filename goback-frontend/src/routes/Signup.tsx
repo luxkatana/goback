@@ -1,5 +1,9 @@
 import { Button, Field, Fieldset, Input, Text, VStack } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
+import { AuthContext, RegisterUser } from "../utils/AuthContext";
+import { useContext, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 interface SignupInput {
 	username: string,
 	email: string,
@@ -11,8 +15,23 @@ export default function Signup() {
 	const { register, handleSubmit, formState: { errors, isValid } } = useForm<SignupInput>({
 		mode: "onChange"
 	});
-	function SignupCallback(data: SignupInput) {
-		console.log(data);
+	const navigator = useNavigate();
+	const auth_holder = useContext(AuthContext);
+	const [loading, setloading] = useState(false);
+	async function SignupCallback(data: SignupInput) {
+		if (loading == false) {
+			setloading(true);
+			const response = await RegisterUser(data.username, data.email, data.password, auth_holder);
+			setloading(false);
+			console.log(response);
+			if (response === true) {
+				toast("Account created, sweet!");
+				navigator('/dashboard');
+			}
+			else {
+				toast.error("Oops..");
+			}
+		}
 	}
 	return <VStack>
 		<form onSubmit={handleSubmit(SignupCallback)}>

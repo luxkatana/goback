@@ -27,7 +27,7 @@ conf_holder: ConfigurationHolder = get_tomllib_config()
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 db_annotated = Annotated[Session, Depends(get_db_session)]
-app.add_middleware(
+app.add_middleware(  # Testing purposes
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
@@ -51,9 +51,10 @@ async def get_user(
 user_annotated = Annotated[User, Depends(get_user)]
 
 
-@app.get("/api/validate", status_code=status.HTTP_204_NO_CONTENT)
-async def validate_access_token(_: user_annotated):
-    return
+@app.get("/api/validate", status_code=status.HTTP_200_OK)
+async def validate_access_token(usr: user_annotated):
+    del usr.password
+    return usr
 
 
 @app.post("/api/login", status_code=status.HTTP_200_OK)

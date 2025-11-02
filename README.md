@@ -17,16 +17,12 @@ This project will be a copy of the wayback machine, but more simpler and basic.
 
 ## Installation
 
-1. Clone this project (the master branch is okay to be cloned I suppose)
-2. Install the modules in requirements (run ``pip3 install -r requirements.txt``)
+1. Clone this project (the master branch is okay to be cloned, but if you're feeling like an adventurer, clone the dev branch)
+2. Install the modules in requirements.txt (run ``pip3 install -r requirements.txt``)
 
 
-Currently, I am spending a lot of time on the scraper.py, later, in the future, I expect to have a fully working version of this project where you can run the webserver, and let it run and just do the things it should do.
-
-By far now, ``scraper.py`` can be runned directly using ``python3 scraper.py``, this will scrape a website and do some analysis.
 
 
-You'll see development and many commits within this project, this is an IT project for computer class.
 
 
 The following media types works:

@@ -10,6 +10,8 @@ import ProtectedComponent from './components/ProtectedComponent'
 import AuthProvider from './utils/AuthContext'
 import { Toaster } from 'react-hot-toast'
 import ErrorPage from './routes/ErrorPage'
+import CreateBackupPage from './routes/CreateBackupPage'
+import LogoutRoute from './routes/LogoutRoute'
 
 
 const router = createBrowserRouter([
@@ -17,6 +19,8 @@ const router = createBrowserRouter([
 	{ path: "/login", element: <Login /> },
 	{ path: "/signup", element: <Signup /> },
 	{ path: "/dashboard", element: <ProtectedComponent><Dashboard /></ProtectedComponent> },
+	{ path: "/create", element: <ProtectedComponent><CreateBackupPage /></ProtectedComponent> },
+	{ path: "/logout", element: <ProtectedComponent><LogoutRoute /></ProtectedComponent> },
 	{ path: "*", element: <ErrorPage /> }
 ])
 
