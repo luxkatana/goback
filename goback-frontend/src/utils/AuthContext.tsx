@@ -61,22 +61,22 @@ export async function AuthenticateUser(username: string, password: string, conte
 	}
 }
 export async function CreateBackupCall(url: string, context: AuthInfo) {
-	try {
-		const response = await AxiosClient.post("/api/scrape", {
-			"url": url
-		}, {
-			headers: {
-				"Authorization": `Bearer ${context.access_token!}`
-			}
-		});
-
-
-	} catch (_: AxiosError | any) {
-		return false
-
-	}
-
-
+	const response = await AxiosClient.post("/api/scrape", {
+		"url": url
+	}, {
+		headers: {
+			"Authorization": `Bearer ${context.access_token!}`
+		}
+	});
+	return response.data.job_id
+}
+export async function FetchJobInfo(job_id: number, auth_context: AuthInfo) {
+	const response = await AxiosClient.get(`/api/job?job_id=${job_id}`, {
+		headers: {
+			"Authorization": `Bearer ${auth_context.access_token!}`
+		}
+	})
+	return response.data;
 }
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -95,7 +95,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 						}
 					});
 					localStorage.setItem("goback_access_token", access_token);
-					console.log(response.data.username);
 					setusername(response.data.username);
 					setisValid(true)
 				} catch (e: AxiosError | any) {

@@ -1,22 +1,32 @@
 import { useContext, useState } from "react"
-import { AuthContext } from "../utils/AuthContext"
+import { AuthContext, CreateBackupCall } from "../utils/AuthContext"
 import { useForm } from "react-hook-form";
 import { Button, Field, Fieldset, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import type { AxiosError } from "axios";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 type CreationFormType = {
 	url: string
 }
 export default function CreateBackupPage() {
 	const auth_context = useContext(AuthContext);
-	const [loadingpage, setloadingpage] = useState<bool>(false);
+	const [loadingpage, setloadingpage] = useState<boolean>(false);
 	const { register, formState: { errors, isValid }, handleSubmit } = useForm<CreationFormType>({ mode: "onChange" });
+	const navigate = useNavigate();
 	async function SubmitCallback(data: CreationFormType) {
 		if (loadingpage == false) {
 			setloadingpage(true);
+			try {
+				const job_id: number = await CreateBackupCall(data.url, auth_context);
+				toast(`Sweet! Currently busy working on it, job id: ${job_id} `);
+				navigate(`/job?job_id=${job_id}`);
 
-
-			console.info(data);
+			} catch (e: AxiosError | any) {
+				toast.error(e);
+			}
 			setloadingpage(false);
+
 		}
 
 
