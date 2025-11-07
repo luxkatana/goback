@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext, FetchJobInfo } from "../utils/AuthContext";
@@ -14,11 +14,19 @@ export default function JobViewer() {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const [job_info, setjobinfo] = useState<JobInfo | null>(null);
+	const shouldRequestData = useRef(true);
+	useEffect(() => {
+		if (job_info?.status.startsWith("Success: ")) {
+			shouldRequestData.current = false;
+		}
+
+	}, [job_info?.status]);
 	const authcontext = useContext(AuthContext);
 	useEffect(() => {
 		const search = new URLSearchParams(location.search);
 		const job_id_to_search: number = parseInt(search.get("job_id")!); // will return NaN if incorrect number
 		async function fetchinfo() {
+			if (shouldRequestData.current == false) { return }
 			try {
 				const response: JobInfo = await FetchJobInfo(job_id_to_search, authcontext);
 				if (isMounted) setjobinfo(response);
