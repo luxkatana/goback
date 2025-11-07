@@ -35,9 +35,9 @@ def setup_tables():
 class User(SQLModel, table=True):
     __tablename__ = "goback_users"
     user_id: int | None = Field(primary_key=True)
-    username: str
-    email: str
-    password: str
+    username: str = Field(max_length=50, nullable=False, min_length=10)
+    email: str = Field(max_length=255, nullable=False)
+    password: str = Field(max_length=255, nullable=False, min_length=8)
 
     def __repr__(self) -> str:
         return f"User({self.user_id},{self.username},{self.email},{self.password})"
