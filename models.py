@@ -1,5 +1,8 @@
 from datetime import datetime
 from secrets import randbits
+from enum import Enum
+import pickle
+from pydantic import BaseModel
 from sqlmodel import SQLModel, Field, Session, create_engine
 from pwdlib import PasswordHash
 from config_manager import (
@@ -16,6 +19,13 @@ conf_holder: ConfigurationHolder = get_tomllib_config()
 db_string = get_working_database_string(conf_holder)
 
 db_engine = create_engine(db_string)
+
+
+class StatusTypesEnum(Enum):
+    SUCCESS = 0
+    INFO = 1
+    ERROR = 2
+    FAILED = 3
 
 
 def get_db_session():
@@ -58,12 +68,22 @@ class SitesMetadata(SQLModel, table=True):
     document_file_id: str
 
 
+class Status(BaseModel):
+    message: str
+    status_type: StatusTypesEnum
+
+
 class JobTask(SQLModel, table=True):
     __tablename__ = "goback_job_tracker"
     job_id: int | None = Field(primary_key=True)
     user_id: int = Field(nullable=False, foreign_key="goback_users.user_id")
     created_at: datetime
-    status: str = Field(default="Working on")
+    status_messages: bytes = Field()  # list[Status]
+
+    def add_status_message(self, message: str, statustype: StatusTypesEnum = StatusTypesEnum.INFO):
+        deserialized: list[Status] = pickle.loads(self.status_messages)
+        deserialized.append(Status(message=message, status_type=statustype))
+        self.status_messages = pickle.dumps(deserialized)
 
     def change_status(self, new_status: str):
         self.status = new_status
