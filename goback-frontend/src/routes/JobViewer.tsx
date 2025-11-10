@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext, FetchJobInfo } from "../utils/AuthContext";
-import { Box, Heading, List, Text, VStack } from "@chakra-ui/react";
+import { Box, Heading, List, Text, VStack, Link } from "@chakra-ui/react";
 import { CiCircleInfo } from "react-icons/ci";
 import { IoIosCheckmarkCircle, IoIosWarning } from "react-icons/io";
 import { BiSolidCommentError } from "react-icons/bi";
@@ -84,7 +84,13 @@ export default function JobViewer() {
 							{job.status_type == StatusTypes.ERROR && <List.Indicator asChild color="yellow.300"><IoIosWarning /></List.Indicator>}
 							{job.status_type == StatusTypes.FAILED && <List.Indicator asChild color="red.300"><BiSolidCommentError /></List.Indicator>}
 
-							{job.message}
+							{job.status_type != StatusTypes.SUCCESS && job.message}
+							{job.status_type == StatusTypes.SUCCESS && <Link
+								href={`http://127.0.0.1:8000/media/${job.message}`}
+								color="green.200"
+								_hover={{ color: "gray.50" }}
+							>{job.message} (click to view)</Link>}
+
 						</List.Item>)}
 				</List.Root>
 			</Box>
