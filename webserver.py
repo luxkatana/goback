@@ -1,4 +1,5 @@
 import asyncio
+import pickle
 from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, Path, status, Response
 import jwt
@@ -15,6 +16,8 @@ from models import (
     SECRET_KEY,
     AssetMetadata,
     JobTask,
+    Status,
+    StatusTypesEnum,
     User,
     get_db_session,
     hasher,
@@ -90,7 +93,11 @@ async def job_status_route(job_id: int, user: user_annotated, db: db_annotated):
     if jobtask is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Jobtask not found")
 
-    return jobtask
+    loaded: list[str] = pickle.loads(jobtask.status_messages)
+
+    response = jobtask.as_dict()
+    response["status_messages"] = loaded
+    return response
 
 
 def task_handler(user_id: int, job_id: int, url: str):
@@ -101,17 +108,19 @@ def task_handler(user_id: int, job_id: int, url: str):
             file_id = asyncio.run(scrape_site(url, user, job))
         except HTTPStatusError as e:
             if e.request.url == url:
-                job.change_status(
-                    f"requested URL host sent error code {e.response.status_code}"
+                job.add_status_message(
+                    f"requested URL host sent error code {e.response.status_code}",
+                    StatusTypesEnum.ERROR,
                 )
             else:
-                job.change_status(
-                    f"Asset of requested URL has sent error code {e.response.status_code}"
+                job.add_status_message(
+                    f"Asset of requested URL has sent error code {e.response.status_code}",
+                    StatusTypesEnum.ERROR,
                 )
         except Exception as e:
-            job.change_status(str(e))
+            job.add_status_message(str(e), StatusTypesEnum.ERROR)
         else:
-            job.change_status(f"Success: {file_id}")
+            job.add_status_message(file_id, StatusTypesEnum.SUCCESS)
         db.commit()
 
 
@@ -123,7 +132,13 @@ class ScrapeUrlPayload(BaseModel):
 async def scrape_site_route(
     db: db_annotated, user: user_annotated, url_payload: ScrapeUrlPayload
 ):  # TODO: url regex
-    new_job = JobTask(user_id=user.user_id, created_at=datetime.datetime.now())
+    new_job = JobTask(
+        user_id=user.user_id,
+        created_at=datetime.datetime.now(),
+        status_messages=pickle.dumps(
+            [Status(message="Job started", status_type=StatusTypesEnum.INFO)]
+        ),
+    )
     db.add(new_job)
     db.commit()
 
