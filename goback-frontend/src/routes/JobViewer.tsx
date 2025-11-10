@@ -97,6 +97,6 @@ export default function JobViewer() {
 			{currentstate == 0 && <Text color="green.300" fontSize="3xl">🎉Finished</Text>}
 		</>}
 
-	</VStack>
+	</VStack >
 	</>
 }
