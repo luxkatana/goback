@@ -7,3 +7,5 @@ PyJWT
 SQLmodel
 email-validator
 rich
+python-multipart
+uvicorn
