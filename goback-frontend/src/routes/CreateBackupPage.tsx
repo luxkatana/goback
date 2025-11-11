@@ -5,6 +5,7 @@ import { Button, Field, Fieldset, Input, Spinner, Text, VStack } from "@chakra-u
 import type { AxiosError } from "axios";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";
 
 type CreationFormType = {
 	url: string
@@ -32,6 +33,7 @@ export default function CreateBackupPage() {
 
 	}
 	return <>
+		<Navbar />
 		<VStack>
 			<form onSubmit={handleSubmit(SubmitCallback)}>
 				<Fieldset.Root>

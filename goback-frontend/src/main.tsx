@@ -14,17 +14,18 @@ import CreateBackupPage from './routes/CreateBackupPage'
 import LogoutRoute from './routes/LogoutRoute'
 import JobViewer from './routes/JobViewer'
 
-
-const router = createBrowserRouter([
-	{ path: "/", element: <Home /> },
-	{ path: "/login", element: <Login /> },
-	{ path: "/signup", element: <Signup /> },
-	{ path: "/dashboard", element: <ProtectedComponent><Dashboard /></ProtectedComponent> },
-	{ path: "/create", element: <ProtectedComponent><CreateBackupPage /></ProtectedComponent> },
+export const routes = [
+	{ path: "/", element: <Home />, name: "Home" },
+	{ path: "/login", element: <Login />, name: "Login" },
+	{ path: "/signup", element: <Signup />, name: "Sign up" },
+	{ path: "/dashboard", element: <ProtectedComponent><Dashboard /></ProtectedComponent>, name: "Dashboard" },
+	{ path: "/create", element: <ProtectedComponent><CreateBackupPage /></ProtectedComponent>, name: "Create an archive" },
 	{ path: "/logout", element: <ProtectedComponent><LogoutRoute /></ProtectedComponent> },
-	{ path: "/job", element: <ProtectedComponent><JobViewer /></ProtectedComponent> },
+	{ path: "/job", element: <ProtectedComponent><JobViewer /></ProtectedComponent>, name: "Job viewer" },
 	{ path: "*", element: <ErrorPage /> }
-])
+]
+
+const router = createBrowserRouter(routes);
 
 createRoot(document.getElementById('root')!).render(
 	<StrictMode>

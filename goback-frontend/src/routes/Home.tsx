@@ -1,9 +1,12 @@
 import { Heading, Highlight, Link, Text, VStack } from "@chakra-ui/react";
 import { Link as RLink } from "react-router-dom";
+import Navbar from "../components/Navbar";
 
 export default function Home() {
 
 	return <>
+		<Navbar />
+
 		<VStack>
 
 			<Heading textStyle="6xl">

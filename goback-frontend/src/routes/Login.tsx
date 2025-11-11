@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link as RLink, useLocation, useNavigate } from "react-router-dom";
 import { AuthContext, AuthenticateUser } from "../utils/AuthContext";
 import toast from "react-hot-toast";
+import Navbar from "../components/Navbar";
 
 interface LoginFormInput {
 	username: string,
@@ -35,9 +36,10 @@ export default function Login() {
 		}
 	}
 	return <>
+		<Navbar />
 		<VStack>
 			<form onSubmit={handleSubmit(SubmitCallback)}>
-				<Fieldset.Root size="lg" maxW="2xl" marginTop="20">
+				<Fieldset.Root size="lg" maxW="2xl">
 
 					<Fieldset.Legend fontSize="4xl">Login form</Fieldset.Legend>
 					<Fieldset.HelperText fontSize="2xl" marginTop="10">
