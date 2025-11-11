@@ -85,9 +85,6 @@ class JobTask(SQLModel, table=True):
         deserialized.append(Status(message=message, status_type=statustype))
         self.status_messages = pickle.dumps(deserialized)
 
-    def change_status(self, new_status: str):
-        self.status = new_status
-
     def as_dict(self) -> dict[str, str]:
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 

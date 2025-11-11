@@ -86,7 +86,7 @@ export default function JobViewer() {
 
 							{job.status_type != StatusTypes.SUCCESS && job.message}
 							{job.status_type == StatusTypes.SUCCESS && <Link
-								href={`http://127.0.0.1:8000/media/${job.message}`}
+								href={`/media/${job.message}`}
 								color="green.200"
 								_hover={{ color: "gray.50" }}
 							>{job.message} (click to view)</Link>}

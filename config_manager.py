@@ -61,6 +61,14 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
         )
         exit(1)
 
+    if not endpoint_url.startswith(
+        "http"
+    ):  # Not a valid url, dumb checking but it works
+        print(
+            "[red bold]ERROR[/red bold]: Appwrite URL endpoint is invalid, perhaps it's not starting with http or https:// "
+        )
+        exit(1)
+
     with BytesIO() as io:
         io.write(b"Validation success")
         response = httpx.post(

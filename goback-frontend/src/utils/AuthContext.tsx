@@ -12,9 +12,7 @@ export type AuthInfo = {
 }
 
 export const AuthContext = createContext<AuthInfo>({ access_token: null, isValid: false, set_access_token: null, setisValid: null, username: null });
-const AxiosClient = axios.create({
-	baseURL: "http://127.0.0.1:8000"
-});
+const AxiosClient = axios.create();
 
 
 export async function RegisterUser(username: string, email: string, password: string, context: AuthInfo) {
