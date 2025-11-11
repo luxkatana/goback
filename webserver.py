@@ -2,6 +2,7 @@ import asyncio
 import pickle
 from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, Path, status, Response
+from fastapi.responses import FileResponse
 import jwt
 import datetime
 from threading import Thread
@@ -12,6 +13,7 @@ from sqlmodel import Session, select
 from fastapi.middleware.cors import CORSMiddleware
 from scraper import main as scrape_site
 from appwrite_session import AppwriteSession
+from fastapi.staticfiles import StaticFiles
 from models import (
     SECRET_KEY,
     AssetMetadata,
@@ -28,6 +30,11 @@ from config_manager import ConfigurationHolder, get_tomllib_config
 conf_holder: ConfigurationHolder = get_tomllib_config()
 
 app = FastAPI()
+app.mount(
+    "/assets",
+    StaticFiles(directory="./goback-frontend/dist/assets"),
+    name="frontend",
+)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 db_annotated = Annotated[Session, Depends(get_db_session)]
 app.add_middleware(  # Testing purposes
@@ -53,6 +60,13 @@ async def get_user(
 
 user_annotated = Annotated[User, Depends(get_user)]
 
+
+@app.get("/")
+def index() -> FileResponse:
+    return FileResponse("./goback-frontend/dist/index.html")
+@app.get("/favicon.ico")
+def favicon() -> FileResponse:
+    return FileResponse("./goback-frontend/dist/favicon.ico")
 
 @app.get("/api/validate", status_code=status.HTTP_200_OK)
 async def validate_access_token(usr: user_annotated):
