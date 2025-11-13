@@ -2,7 +2,7 @@ beautifulsoup4
 fastapi
 httpx
 lxml
-pwdlib
+pwdlib[argon2]
 PyJWT
 SQLmodel
 email-validator
