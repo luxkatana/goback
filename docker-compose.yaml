@@ -1,0 +1,12 @@
+services:
+  db:
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: cutekittens123
+      MYSQL_DATABASE: goback
+      MYSQL_USER: goback_db
+    
+    ports:
+      - "127.0.0.1:3901:8000"
+    
