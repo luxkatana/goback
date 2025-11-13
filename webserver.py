@@ -194,6 +194,13 @@ async def signup(db: db_annotated, signupcreds: SignupCredentials):
     return {"access_token": access_token}
 
 
+@app.get("/api/jobs")
+async def get_jobs(user: user_annotated, db: db_annotated):
+    return {
+            "jobs": db.exec(select(JobTask).where(JobTask.user_id == user.user_id)).all()
+            }
+
+
 @app.get("/media/{file_id}")
 async def get_media(
     file_id: Annotated[str, Path(max_length=32, min_length=32)], db: db_annotated
