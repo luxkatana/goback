@@ -3,10 +3,14 @@ services:
     image: mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: cutekittens123
+      MYSQL_ALLOW_EMPTY_PASSWORD: true
       MYSQL_DATABASE: goback
       MYSQL_USER: goback_db
+      MYSQL_PASSWORD: cutekittens123
     
     ports:
-      - "127.0.0.1:3901:8000"
+      - 3306:3306
+    expose:
+      - 3306
+
     
