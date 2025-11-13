@@ -196,8 +196,15 @@ async def signup(db: db_annotated, signupcreds: SignupCredentials):
 
 @app.get("/api/jobs")
 async def get_jobs(user: user_annotated, db: db_annotated):
+    jobs = db.exec(select(JobTask).where(JobTask.user_id == user.user_id)).all()
+    def deserialize_object(job: JobTask) -> dict:
+        dict_return = job.model_dump(exclude="status_messages")
+        dict_return['status_messages'] = pickle.loads(job.status_messages)
+        return dict_return
+    jobs = list(map(deserialize_object, jobs))
     return {
-            "jobs": db.exec(select(JobTask).where(JobTask.user_id == user.user_id)).all()
+            "length": len(jobs),
+            "jobs": jobs
             }
 
 
