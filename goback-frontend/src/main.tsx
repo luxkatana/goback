@@ -22,9 +22,9 @@ export const routes = [
 	{ path: "/signup", element: <Signup />, name: "Sign up" },
 	{ path: "/dashboard", element: <ProtectedComponent><Dashboard /></ProtectedComponent>, name: "Dashboard" },
 	{ path: "/create", element: <ProtectedComponent><CreateBackupPage /></ProtectedComponent>, name: "Create an archive" },
-	{ path: "/logout", element: <ProtectedComponent><LogoutRoute /></ProtectedComponent>, name: "Logout" },
 	{ path: "/job", element: <ProtectedComponent><JobViewer /></ProtectedComponent> },
 	{ path: "/jobs", element: <ProtectedComponent><ListJobs /></ProtectedComponent>, name: "My jobs" },
+	{ path: "/logout", element: <ProtectedComponent><LogoutRoute /></ProtectedComponent>, name: "Logout" },
 	{ path: "*", element: <ErrorPage /> }
 ]
 
