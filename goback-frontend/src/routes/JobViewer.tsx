@@ -2,20 +2,14 @@ import { useContext, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext, FetchJobInfo } from "../utils/AuthContext";
+import type { Job } from "../types/Job";
 import { Box, Heading, List, Text, VStack, Link } from "@chakra-ui/react";
 import { CiCircleInfo } from "react-icons/ci";
 import { IoIosCheckmarkCircle, IoIosWarning } from "react-icons/io";
 import { BiSolidCommentError } from "react-icons/bi";
 import Navbar from "../components/Navbar";
 
-type Job = {
-	created_at: string,
-	status_messages: {
-		message: string,
-		status_type: number
-	}[],
-	job_id: number
-}
+
 
 enum StatusTypes {
 	SUCCESS = 0,
@@ -28,6 +22,7 @@ enum StatusTypes {
 export default function JobViewer() {
 	const location = useLocation();
 	const navigate = useNavigate();
+
 	const [job_info, setjobinfo] = useState<Job | null>(null);
 	const shouldRequestData = useRef(true);
 	const [currentstate, setcurrentstate] = useState(-1); // 0 or 3
@@ -55,6 +50,11 @@ export default function JobViewer() {
 			}
 
 		}
+		if (isNaN(job_id_to_search)) {
+			toast.error("Whoopsie, just accessed an inaccessible page (missing job id)");
+			navigate("/dashboard");
+			return clearEffect
+		}
 		fetchinfo();
 		const fetch_interval = setInterval(fetchinfo, 2000);
 		function clearEffect() {
@@ -62,11 +62,6 @@ export default function JobViewer() {
 			clearInterval(fetch_interval);
 		}
 		let isMounted = true;
-		if (isNaN(job_id_to_search)) {
-			toast.error("Whoopsie, just accessed an inaccessible page (missing job id)");
-			navigate("/dashboard");
-			return clearEffect
-		}
 		return clearEffect
 	}, [location.search, navigate, authcontext]);
 	return <>

@@ -4,6 +4,7 @@ import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { AuthContext } from "../utils/AuthContext";
 import { routes } from "../main";
 import ProtectedComponent from "./ProtectedComponent";
+import { ColorModeButton } from "./ui/color-mode";
 interface NavbarProps {
 	to: string,
 	current_url: boolean,
@@ -24,6 +25,7 @@ export default function Navbar() {
 	const location = useLocation();
 	return <>
 		<Box padding={5} marginBottom={5}>
+			<ColorModeButton />
 			<Flex gap="4" justifyContent="center">
 				{routes.map((route) => {
 					var is_current_url: boolean = false;
@@ -35,6 +37,9 @@ export default function Navbar() {
 
 					if (route.name == null) { return <></> }
 					if (route.element.type === ProtectedComponent && auth_holder.isValid == false) {
+						return <></>
+					}
+					if (route.element.type !== ProtectedComponent && auth_holder.isValid == true) {
 						return <></>
 					}
 					return <NavbarLink current_url={is_current_url} to={route.path}>{route.name}</NavbarLink>

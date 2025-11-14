@@ -14,7 +14,7 @@ export default function ProtectedComponent({ children }: { children: React.React
 			toast("Please login to continue")
 			navigate(`/login?n=${location.pathname}`);
 		}
-	}, [auth.isValid, navigate, location.pathname, auth.loading]);
+	}, [auth.loading]);
 	return <>
 		{children}
 	</>

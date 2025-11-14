@@ -8,11 +8,11 @@ export default function LogoutRoute() {
 	const navigate = useNavigate();
 	useEffect(() => {
 		if (auth_config.loading === false) {
-			toast(`Logged out, bye ${auth_config.username}!`);
+			toast(`Logged out`);
+			navigate("/");
 			localStorage.removeItem("goback_access_token");
 			auth_config.setisValid!(false);
-			navigate("/");
 		}
-	}, [auth_config.setisValid, auth_config.username, navigate, auth_config.loading]);
+	}, [auth_config.loading]);
 	return <>Bye</>
 }

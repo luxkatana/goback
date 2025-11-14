@@ -12,8 +12,30 @@ export type AuthInfo = {
 }
 
 export const AuthContext = createContext<AuthInfo>({ access_token: null, isValid: false, set_access_token: null, setisValid: null, username: null });
-const AxiosClient = axios.create();
+console.info(import.meta.env);
+const AxiosClient = axios.create({
+	baseURL: import.meta.env.DEV === true ? "http://127.0.0.1:8000" : ""
+});
 
+export async function GetJobs(context: AuthInfo) {
+	try {
+		const response = await AxiosClient.get("/api/jobs", {
+			headers: {
+				"Authorization": `Bearer ${context.access_token}`
+			}
+		});
+		return {
+			success: true,
+			...response.data
+		}
+	} catch (e: any) {
+		toast.error(`Error when getting jobs: ${e}`);
+		return {
+			success: false,
+		};
+	}
+
+}
 
 export async function RegisterUser(username: string, email: string, password: string, context: AuthInfo) {
 	try {
