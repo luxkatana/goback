@@ -1,7 +1,10 @@
 import aiomysql
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
+from rich import print
 import hashlib
+
+from sqlmodel import Session, select
 from appwrite_session import (
     AppwriteSession,
     create_file_identifier,
@@ -10,11 +13,29 @@ from appwrite_session import (
     APPWRITE_STORAGE_BUCKET_ID,
 )
 from urllib.parse import urlparse
-from dotenv import load_dotenv
-import asyncio, bs4, httpx, re, os
+import asyncio, bs4, httpx
 
-load_dotenv()
+from models import AssetMetadata, JobTask, User, db_engine
+from config_manager import get_tomllib_config, ConfigurationHolder
+
+conf_holder: ConfigurationHolder = get_tomllib_config()
 URL_TAGS = frozenset(("href", "src"))
+
+
+def prepare_dummy_user() -> User:
+    with Session(db_engine) as session:
+        usr = session.exec(select(User).where(User.user_id == -1)).first()  # Guest id
+        if usr is not None:
+            return usr
+        guestusr = User(
+            user_id=-1,
+            username="Guest user DO NOT DELETE",
+            password="iamaguest!!!",
+            email="someguests@luxkatana.eu",
+        )
+        session.add(guestusr)
+        session.commit()
+        return guestusr
 
 
 def findcorresponding_mimetype(element: PageElement) -> str:
@@ -28,16 +49,16 @@ def findcorresponding_mimetype(element: PageElement) -> str:
     return "any"
 
 
-# returns: mimetype as str
+APPWRITE_KEY = conf_holder.api_key
+HOST_WEBSERVER_URL = conf_holder.media_url
+INTERACTIVE_MODE = __name__ == "__main__"
 
 
-CORRESPONDING_MIMETYPES: dict[str, str] = {
-    "script": lambda element: element.attrs.get("link") == "stylesheet"
-    and element.attrs.get("href"),
-}
-APPWRITE_KEY = os.getenv("APPWRITE_KEY")
-HOST_WEBSERVER_URL = os.getenv("GOBACK_MEDIA_URL")
-#   "https://upgraded-space-invention-5rx6w7q5j74fp6r5-5000.app.github.dev"
+def dprint(*args, **kwargs) -> None:
+    if INTERACTIVE_MODE:
+        print(*args, **kwargs)
+    else:
+        print(f"[blue bold][FROM WEBSERVER DBG MESSAGES][/blue bold]", *args, **kwargs)
 
 
 class GobackScraper:
@@ -83,6 +104,7 @@ class GobackScraper:
         )
 
     # This may be useful in the future, in case we need more complexity
+    """
     async def walk_through(
         self, elements: list[PageElement]
     ) -> list[PageElement] | None:
@@ -100,72 +122,104 @@ class GobackScraper:
                 case bs4.element.NavigableString:
                     ...
         return useful_elements
+    """
 
-    async def request_html_of_link(self, url: str) -> httpx.Response:
+    async def request_html_of_link(
+        self, url: str, return_mimetype: bool = False
+    ) -> tuple[httpx.Response, str]:
         response = await self.httpx_client.get(url)
-        return response.raise_for_status()
+        return (
+            response.raise_for_status(),
+            response.headers.get("Content-Type") if return_mimetype is True else False,
+        )
 
 
-async def main(url: str) -> None:
+async def main(
+    url: str, user: User | None = None, job_task: JobTask | None = None
+) -> str:
+    dprint("TASK STARTED")
     scraper = GobackScraper(url)
+    prepare_dummy_user()
     await scraper.load_html()
+
     useful_element = await scraper.walk_through_native()
     """
     if len(useful_element) == 0:
-        print("Nothing to save")
+        dprint("Nothing to save")
         exit(0)
     """
 
-    regex_valid_urls = re.compile(
-        r"^(?:\/[\w\-./%~]+|(?:\.\.\/|\./)?[\w\-./%~]+|\?[^\s]+)$"
-    )
     async with AppwriteSession() as session:
         for attributes, element in useful_element:
             # an attempt to catch the mime type by html tag
 
             mimetype = findcorresponding_mimetype(element)
-            print("Mime type:", mimetype)
 
             for key, value in attributes.items():
-                if re.fullmatch(regex_valid_urls, value) is not None:
-                    if value.startswith("/"):  # Path
-                        url_obj = urlparse(url)._replace(query=None, path=value)
-                        element_response = await scraper.request_html_of_link(
-                            url_obj.geturl()
-                        )
-                        unique_identifier = create_file_identifier(
-                            element_response.text, url_obj.hostname
-                        )
-                        try:
-                            savedfile = await session.appwrite_publish_media(
-                                unique_identifier, element_response.content
-                            )
-                        except Exception:
-                            print(
-                                "File exists on the server, but I am just going to delete that"
-                            )
-                            md5_hash = hashlib.md5(
-                                unique_identifier.encode()
-                            ).hexdigest()
-                            await session.httpx_client.delete(
-                                f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
-                            )
-                            # _response.raise_for_status()
-                            savedfile = await session.appwrite_publish_media(
-                                unique_identifier, element_response.content
-                            )
+                url_check = urlparse(value)
+                asset_response: None | httpx.Response = None
+                if len(url_check.scheme) == 0 and any(
+                    [url_check.path.startswith(x) for x in [".", "#"]]
+                ):
+                    dprint(
+                        f"Scraper doesnt support urls such as {value} and therefore will be ignored"
+                    )
+                    continue
 
-                        element.attrs[key] = (
-                            f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
+                if (
+                    len(url_check.scheme) == 0 and len(url_check.path) != 0
+                ):  # Doesnt have a scheme, and therefore is something like /here.jpg or here.jpg
+                    url_check = urlparse(url)._replace(query=None, path=url_check.path)
+
+                try:
+                    asset_response, optional_mimetype = (
+                        await scraper.request_html_of_link(
+                            url_check.geturl(),
+                            return_mimetype=(
+                                asset_response == "any"
+                            ),  # An attempt on obtaining the mime-type by response
                         )
-                        async with session.mysql_conn.cursor() as cursor:
-                            cursor: aiomysql.Cursor
-                            print(mimetype)
-                            await cursor.execute(
-                                "INSERT INTO goback_assets_metadata (file_id, mimetype) VALUES (%s, %s)",
-                                (savedfile.appwrite_file_id, mimetype),
-                            )
-                            await session.mysql_conn.commit()
+                    )
+                except httpx._exceptions.HTTPStatusError as e:
+                    if job_task:
+                        raise e
+                    dprint(
+                        f"Error when trying to fetch (this element will therefore be skipped) {url_check}\t{e}"
+                    )
+                    continue
+
+                if optional_mimetype is not False:
+                    mimetype = optional_mimetype
+                unique_identifier = create_file_identifier(
+                    asset_response.text, urlparse(url).hostname
+                )
+                try:
+                    savedfile = await session.appwrite_publish_media(
+                        unique_identifier, asset_response.content
+                    )
+                except Exception:
+                    dprint(
+                        "File exists on the server, but I am just going to delete that"
+                    )
+                    md5_hash = hashlib.md5(unique_identifier.encode()).hexdigest()
+                    await session.httpx_client.delete(
+                        f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
+                    )
+                    # _response.raise_for_status()
+                    savedfile = await session.appwrite_publish_media(
+                        unique_identifier, asset_response.content
+                    )
+
+                element.attrs[key] = (
+                    f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
+                )
+                with Session(db_engine) as db_session:
+                    new_asset = AssetMetadata(
+                        file_id=savedfile.appwrite_file_id, mimetype=mimetype
+                    )
+                    db_session.add(new_asset)
+                    db_session.commit()
+
         site_document_indentifier = create_file_identifier(
             str(scraper.main_html_content), url
         )
@@ -182,22 +236,27 @@ async def main(url: str) -> None:
                 site_document_indentifier, str(scraper.main_html_content).encode()
             )
 
-        print("==========HTML_CONTENT==========")
-        print(str(scraper.main_html_content))
-        print("================================")
+        dprint("==========HTML_CONTENT==========")
+        dprint(str(scraper.main_html_content))
+        dprint("================================")
 
-        print(
+        dprint(
             "file id to access with through appwrite:",
             document_metadata.appwrite_file_id,
         )
-        print(
+        dprint(
             f"Link to access file (based on env vars): {HOST_WEBSERVER_URL}/media/{document_metadata.appwrite_file_id}"
         )
-        await insert_site_row(url, document_metadata.appwrite_file_id)
+        await insert_site_row(
+            url,
+            document_metadata.appwrite_file_id,
+            -1 if user is None else user.user_id,
+        )
+        return document_metadata.appwrite_file_id
 
 
 if (
-    __name__ == "__main__"
+    INTERACTIVE_MODE
 ):  # Directly ran using the python3 interpreter, prevents accidental runs for example as importing this module
     url = input("Enter url to retrieve (live mode or something): ")
     url = (

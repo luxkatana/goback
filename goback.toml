@@ -1,0 +1,32 @@
+[database]
+db_connection_string = "" # URI that contains your database credentials (e.g mysql://luxkatana:password1234@192.168.1.200:3306/mydatabase)
+use_sqlite_as_fallback_option = true # use sqlite memory as fallback option, in case db_connection_string fails
+sqlite_fallback_filepath = "./_tempfile.db" # sqlite database file-path in case the above field is true (or use :memory: for in-memory database which is not persistent)
+
+[appwrite-secrets]
+api_key = "" # usually starts with standard_
+endpoint_url = "" # Endpoint that goback should request to for appwrite
+project_id = "" 
+storage_bucket_id = ""
+
+
+[goback]
+media_url="http://127.0.0.1:8000"
+#this is a very important configuration, "media_url" is the url that should be used to rewrite HTML assets in a document
+# Set it to an accessible domain such as http://127.0.0.1 or mydomain.com, it must be accessible from outside
+# change media_url to "http://127.0.0.1:8000" if you're running this in debug mode
+# For example, if the requested webserver has the following HTML document:
+# <!DOCTYPE html>
+# <html>
+# <body>
+# <img src="https://somelinktoapicture.com"/>
+# </body>
+# </html>
+
+# Goback will rewrite this document, and save it in appwrite as
+# <!DOCTYPE html>
+# <html>
+# <body>
+# <img src="{media_url}/media/<md5_hash>"/>
+# </body>
+# </html>

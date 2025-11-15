@@ -1,7 +1,13 @@
-Flask[async]
-async-appwrite
 beautifulsoup4
-python-dotenv
+fastapi
 httpx
 lxml
-aiomysql
+pwdlib[argon2]
+PyJWT
+SQLmodel
+email-validator
+rich
+python-multipart
+uvicorn[standard]
+python-dotenv
+pymysql

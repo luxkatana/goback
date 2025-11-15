@@ -1,31 +1,27 @@
-from dotenv import load_dotenv
-from os import environ
 from hashlib import md5, sha256
 from io import BytesIO
-import aiomysql, httpx
 
-load_dotenv()
-APPWRITE_API_KEY = environ["APPWRITE_KEY"]
-APPWRITE_ENDPOINT = environ["APPWRITE_ENDPOINT"]
-APPWRITE_PROJECT_ID = environ["APPWRITE_PROJECT_ID"]
-APPWRITE_STORAGE_BUCKET_ID = environ["APPWRITE_STORAGE_BUCKET_ID"]
-MYSQL_HOST: str = environ["MYSQL_HOST"]
-MYSQL_USER: str = environ["MYSQL_USER"]
-MYSQL_PASS: str = environ["MYSQL_PASSWORD"]
-MYSQL_DB: str = environ["MYSQL_DB"]
-MYSQL_CREDS_TUPLE: tuple[str, ...] = (MYSQL_HOST, MYSQL_USER, MYSQL_PASS, MYSQL_DB)
+from sqlmodel import Session
+from models import SitesMetadata, db_engine
+from config_manager import get_tomllib_config, validate_appwrite_credentials
+import httpx
+
+holder = get_tomllib_config()
+
+APPWRITE_API_KEY = holder.api_key
+APPWRITE_ENDPOINT = holder.endpoint_url
+APPWRITE_PROJECT_ID = holder.project_id
+APPWRITE_STORAGE_BUCKET_ID = holder.storage_bucket_id
+validate_appwrite_credentials(holder)
 
 
-async def insert_site_row(site_url: str, document_file_id: str):
-    async with aiomysql.connect(*MYSQL_CREDS_TUPLE) as connection:
-        async with connection.cursor() as cursor:
-            cursor: aiomysql.Cursor
-            await cursor.execute(
-                "INSERT INTO goback_sites_metadata (site_url, document_file_id) VALUES (%s,%s)",
-                (site_url, document_file_id),
-            )
-
-        await connection.commit()
+async def insert_site_row(site_url: str, document_file_id: str, user_id: int = -1):
+    with Session(db_engine) as db_session:
+        new_metadata = SitesMetadata(
+            site_url=site_url, document_file_id=document_file_id, user_id=user_id
+        )
+        db_session.add(new_metadata)
+        db_session.commit()
 
 
 def create_file_identifier(file_content: str, host_url: str) -> str:
