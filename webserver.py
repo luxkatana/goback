@@ -30,11 +30,18 @@ from config_manager import ConfigurationHolder, get_tomllib_config
 conf_holder: ConfigurationHolder = get_tomllib_config()
 
 app = FastAPI()
-app.mount(
-    "/assets",
-    StaticFiles(directory="./goback-frontend/dist/assets"),
-    name="frontend",
-)
+prod_mode = False
+try:
+    app.mount(
+        "/assets",
+        StaticFiles(directory="./goback-frontend/dist/assets"),
+        name="frontend",
+    )
+    prod_mode = True
+except RuntimeError:
+    print(
+        "Detecting development/debugging mode (missing ./goback-frontend/dist/assets dir)"
+    )
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
 db_annotated = Annotated[Session, Depends(get_db_session)]
 app.add_middleware(  # Testing purposes
@@ -61,12 +68,16 @@ async def get_user(
 user_annotated = Annotated[User, Depends(get_user)]
 
 
-@app.get("/")
-def index() -> FileResponse:
-    return FileResponse("./goback-frontend/dist/index.html")
-@app.get("/favicon.ico")
-def favicon() -> FileResponse:
-    return FileResponse("./goback-frontend/dist/favicon.ico")
+if prod_mode:
+
+    @app.get("/")
+    def index() -> FileResponse:
+        return FileResponse("./goback-frontend/dist/index.html")
+
+    @app.get("/favicon.ico")
+    def favicon() -> FileResponse:
+        return FileResponse("./goback-frontend/dist/favicon.ico")
+
 
 @app.get("/api/validate", status_code=status.HTTP_200_OK)
 async def validate_access_token(usr: user_annotated):
@@ -197,15 +208,14 @@ async def signup(db: db_annotated, signupcreds: SignupCredentials):
 @app.get("/api/jobs")
 async def get_jobs(user: user_annotated, db: db_annotated):
     jobs = db.exec(select(JobTask).where(JobTask.user_id == user.user_id)).all()
+
     def deserialize_object(job: JobTask) -> dict:
         dict_return = job.model_dump(exclude="status_messages")
-        dict_return['status_messages'] = pickle.loads(job.status_messages)
+        dict_return["status_messages"] = pickle.loads(job.status_messages)
         return dict_return
+
     jobs = list(map(deserialize_object, jobs))
-    return {
-            "length": len(jobs),
-            "jobs": jobs
-            }
+    return {"length": len(jobs), "jobs": jobs}
 
 
 @app.get("/media/{file_id}")
