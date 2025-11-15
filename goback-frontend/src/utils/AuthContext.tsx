@@ -55,8 +55,11 @@ export async function RegisterUser(username: string, email: string, password: st
 		return true;
 
 	} catch (e: AxiosError | any) {
-		console.error(e);
-		toast.error(`Error when registering: ${e}`);
+		if (e.status === 400) {
+			toast.error("Error, Username already exists :(");
+
+		} else
+			toast.error(`Error when registering: ${e}`);
 		return false;
 	}
 
