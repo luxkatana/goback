@@ -2,8 +2,12 @@ from io import BytesIO
 import tomllib
 from rich import print
 from sqlmodel import create_engine
+from dotenv import load_dotenv
+from os import environ
 import httpx
 from typing import Any
+
+load_dotenv()
 
 
 class ConfigurationHolder:
@@ -122,17 +126,53 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
 
 def get_tomllib_config() -> ConfigurationHolder:
     config_holder = ConfigurationHolder()
-    with open("./goback.toml", "rb") as file:
-        configuration = tomllib.load(file)
 
+    try:
+        with open("./goback.toml", "rb") as file:
+            configuration = tomllib.load(file)
+    except FileNotFoundError:
+        print(
+            "[bold yellow]Warning[/bold yellow], using environment variables, because goback.toml is missing"
+        )
+        try:  # In docker/environment var mode
+            api_key = environ["GOBACK_KEY"]
+            endpoint_url = environ["GOBACK_ENDPOINT_URL"]
+            project_id = environ["GOBACK_PROJECT_ID"]
+            storage_bucket_id = environ["GOBACK_STORAGE_BUCKET_ID"]
+            media_url = environ["GOBACK_MEDIA_URL"]
+            mysql_uri = environ["GOBACK_MYSQL_URI"]
+            return ConfigurationHolder(
+                db_connection_string=mysql_uri,
+                use_sqlite_as_fallback_option=True,
+                sqlite_fallback_filepath="./goback.db",
+                api_key=api_key,
+                endpoint_url=endpoint_url,
+                project_id=project_id,
+                storage_bucket_id=storage_bucket_id,
+                media_url=media_url,
+            )
+        except KeyError:
+            print(
+                "[bold red]Error[/bold red], missing one of the following required environment variables"
+            )
+            print(
+                "GOBACK_KEY, GOBACK_ENDPOINT_URL, GOBACK_PROJECT_ID, GOBACK_STORAGE_BUCKET_ID, GOBACK_MYSQL_URI, GOBACK_MEDIA_URL"
+            )
+            print(
+                "[bold blue]Tip[/bold blue], if you're running goback in a docker container, define the environment variables by passing them with the -e flag or using an .env file."
+            )
+            exit(1)
+
+    print("Using goback.toml")
     for sections in configuration.values():
         for inner_key in sections:
             inner_val = sections[inner_key]
             setattr(config_holder, inner_key, inner_val)
+
     return config_holder
 
 
 if __name__ == "__main__":
     holder = get_tomllib_config()
 
-    (validate_appwrite_credentials(holder))
+    validate_appwrite_credentials(holder)
