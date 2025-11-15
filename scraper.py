@@ -1,4 +1,3 @@
-import aiomysql
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
 from rich import print
@@ -15,7 +14,9 @@ from appwrite_session import (
 from urllib.parse import urlparse
 import asyncio, bs4, httpx
 
-from models import AssetMetadata, JobTask, User, db_engine
+
+from models import AssetMetadata, JobTask, StatusTypesEnum, User, db_engine
+
 from config_manager import get_tomllib_config, ConfigurationHolder
 
 conf_holder: ConfigurationHolder = get_tomllib_config()
@@ -50,7 +51,7 @@ def findcorresponding_mimetype(element: PageElement) -> str:
 
 
 APPWRITE_KEY = conf_holder.api_key
-HOST_WEBSERVER_URL = conf_holder.media_url
+
 INTERACTIVE_MODE = __name__ == "__main__"
 
 
@@ -142,6 +143,9 @@ async def main(
     prepare_dummy_user()
     await scraper.load_html()
 
+    db_session = Session(db_engine)
+
+
     useful_element = await scraper.walk_through_native()
     """
     if len(useful_element) == 0:
@@ -157,13 +161,21 @@ async def main(
 
             for key, value in attributes.items():
                 url_check = urlparse(value)
-                asset_response: None | httpx.Response = None
                 if len(url_check.scheme) == 0 and any(
-                    [url_check.path.startswith(x) for x in [".", "#"]]
+                    [value.startswith(x) for x in [".", "#"]]
                 ):
-                    dprint(
-                        f"Scraper doesnt support urls such as {value} and therefore will be ignored"
-                    )
+                    if value.startswith("."):  # These are paths such as ./here.jpg
+                        if user == None:
+                            dprint(
+                                f"Scraper doesnt support urls such as {value} and therefore will be ignored"
+                            )
+                        else:
+                            job_task.add_status_message(
+                                f"Scraper doesn't support urls such as {value}. This element will be skipped.",
+                                StatusTypesEnum.INFO,
+                            )
+                            db_session.commit()
+
                     continue
 
                 if (
@@ -176,16 +188,21 @@ async def main(
                         await scraper.request_html_of_link(
                             url_check.geturl(),
                             return_mimetype=(
-                                asset_response == "any"
-                            ),  # An attempt on obtaining the mime-type by response
+                                mimetype == "any"
+                            ),  # A second attempt on obtaining the mime-type by response
                         )
                     )
                 except httpx._exceptions.HTTPStatusError as e:
-                    if job_task:
-                        raise e
-                    dprint(
-                        f"Error when trying to fetch (this element will therefore be skipped) {url_check}\t{e}"
-                    )
+                    if user == None:
+                        dprint(
+                            f"Error when trying to fetch (this element will therefore be skipped) {url_check}\t{e}"
+                        )
+                    else:
+                        job_task.add_status_message(
+                            f"Error when trying to fetch element, this element will be skipped. The url: {url_check} replied with {e.response.status_code}",
+                            StatusTypesEnum.ERROR,
+                        )
+                        db_session.commit()
                     continue
 
                 if optional_mimetype is not False:
@@ -198,27 +215,30 @@ async def main(
                         unique_identifier, asset_response.content
                     )
                 except Exception:
-                    dprint(
-                        "File exists on the server, but I am just going to delete that"
-                    )
+                    if user == None:
+                        dprint(
+                            "File exists on the server, but I am just going to delete that"
+                        )
+                    else:
+                        job_task.add_status_message(
+                            "File exists on the server, but I am just going to delete that"
+                        )
+                        db_session.commit()
+
                     md5_hash = hashlib.md5(unique_identifier.encode()).hexdigest()
                     await session.httpx_client.delete(
                         f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
                     )
-                    # _response.raise_for_status()
                     savedfile = await session.appwrite_publish_media(
                         unique_identifier, asset_response.content
                     )
 
-                element.attrs[key] = (
-                    f"{HOST_WEBSERVER_URL}/media/{savedfile.appwrite_file_id}"
+                element.attrs[key] = f"/media/{savedfile.appwrite_file_id}"
+                new_asset = AssetMetadata(
+                    file_id=savedfile.appwrite_file_id, mimetype=mimetype
                 )
-                with Session(db_engine) as db_session:
-                    new_asset = AssetMetadata(
-                        file_id=savedfile.appwrite_file_id, mimetype=mimetype
-                    )
-                    db_session.add(new_asset)
-                    db_session.commit()
+                db_session.add(new_asset)
+                db_session.commit()
 
         site_document_indentifier = create_file_identifier(
             str(scraper.main_html_content), url
@@ -236,17 +256,22 @@ async def main(
                 site_document_indentifier, str(scraper.main_html_content).encode()
             )
 
-        dprint("==========HTML_CONTENT==========")
-        dprint(str(scraper.main_html_content))
-        dprint("================================")
+        db_session.close()
 
-        dprint(
-            "file id to access with through appwrite:",
-            document_metadata.appwrite_file_id,
-        )
-        dprint(
-            f"Link to access file (based on env vars): {HOST_WEBSERVER_URL}/media/{document_metadata.appwrite_file_id}"
-        )
+        if INTERACTIVE_MODE:
+            dprint("==========HTML_CONTENT==========")
+            dprint(str(scraper.main_html_content))
+            dprint("================================")
+
+            dprint(
+                "file id to access with through appwrite:",
+                document_metadata.appwrite_file_id,
+            )
+            dprint(
+                f"To access this page, run the webserver using uvicorn, or docker, and then go to <webserver_socket>/media/{document_metadata.appwrite_file_id}"
+            )
+        else:
+            dprint(f"TASK FINISHED FROM USER {user.username}")
         await insert_site_row(
             url,
             document_metadata.appwrite_file_id,

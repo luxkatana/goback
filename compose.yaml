@@ -8,7 +8,6 @@ services:
       - "8000:8000"
     environment:
       GOBACK_MYSQL_URI: "mysql+pymysql://goback_usr:goback_usr1234@db:3306/goback"
-      GOBACK_MEDIA_URL: "http://127.0.0.1:8000"
       GOBACK_KEY: ${GOBACK_KEY}
 
       GOBACK_ENDPOINT_URL: ${GOBACK_ENDPOINT_URL}

@@ -1,3 +1,6 @@
+
+/.env
+
 /_*
 /__pycache__
 /playground

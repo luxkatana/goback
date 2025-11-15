@@ -1,8 +1,8 @@
-# goback - Betere versie van wayback
+# goback - A pocket-sized version of wayback
 
-## What is this project?
+## About the project
 
-This project will be a copy of the wayback machine, but more simpler and basic.
+I think we all are familair with wayback
 
 
 
