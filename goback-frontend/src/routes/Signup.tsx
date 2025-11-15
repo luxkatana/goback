@@ -24,13 +24,9 @@ export default function Signup() {
 			setloading(true);
 			const response = await RegisterUser(data.username, data.email, data.password, auth_holder);
 			setloading(false);
-			console.log(response);
 			if (response === true) {
 				toast("Account created, sweet!");
 				navigator('/dashboard');
-			}
-			else {
-				toast.error("Oops..");
 			}
 		}
 	}

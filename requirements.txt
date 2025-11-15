@@ -8,4 +8,6 @@ SQLmodel
 email-validator
 rich
 python-multipart
-uvicorn
+uvicorn[standard]
+python-dotenv
+pymysql
