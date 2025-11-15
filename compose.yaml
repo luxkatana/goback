@@ -1,0 +1,32 @@
+services:
+  goback:
+    image: luxkatana/goback:latest
+    restart: no
+    depends_on: 
+      - db
+    ports:
+      - "8000:8000"
+    environment:
+      GOBACK_MYSQL_URI: "mysql+pymysql://goback_usr:goback_usr1234@db:3306/goback"
+      GOBACK_MEDIA_URL: "http://127.0.0.1:8000"
+      GOBACK_KEY: ${GOBACK_KEY}
+
+      GOBACK_ENDPOINT_URL: ${GOBACK_ENDPOINT_URL}
+      GOBACK_PROJECT_ID: ${GOBACK_PROJECT_ID}
+      GOBACK_STORAGE_BUCKET_ID: ${GOBACK_STORAGE_BUCKET_ID}
+  db:
+    image: mysql
+    restart: no
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: yes
+      MYSQL_DATABASE: goback
+      MYSQL_USER: goback_usr
+      MYSQL_PASSWORD: goback_usr1234
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+
+
+volumes:
+  mysql_data:
+
