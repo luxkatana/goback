@@ -1,3 +1,4 @@
+import aiomysql
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
 from rich import print

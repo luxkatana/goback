@@ -46,6 +46,9 @@ class SavedFile:
 
 class AppwriteSession:
     async def __aenter__(self):
+        self.mysql_conn: aiomysql.Connection = await aiomysql.connect(
+            *MYSQL_CREDS_TUPLE
+        )
         self.httpx_client = httpx.AsyncClient(
             headers={
                 "X-Appwrite-Project": APPWRITE_PROJECT_ID,
@@ -55,6 +58,8 @@ class AppwriteSession:
         return self
 
     async def __aexit__(self, *_):
+        if self.mysql_conn is not None:
+            self.mysql_conn.close()
         if self.httpx_client is not None:
             await self.httpx_client.aclose()
 
