@@ -14,7 +14,9 @@ from appwrite_session import (
 from urllib.parse import urlparse
 import asyncio, bs4, httpx
 
+
 from models import AssetMetadata, JobTask, StatusTypesEnum, User, db_engine
+
 from config_manager import get_tomllib_config, ConfigurationHolder
 
 conf_holder: ConfigurationHolder = get_tomllib_config()
@@ -49,6 +51,7 @@ def findcorresponding_mimetype(element: PageElement) -> str:
 
 
 APPWRITE_KEY = conf_holder.api_key
+
 INTERACTIVE_MODE = __name__ == "__main__"
 
 
@@ -139,7 +142,9 @@ async def main(
     scraper = GobackScraper(url)
     prepare_dummy_user()
     await scraper.load_html()
+
     db_session = Session(db_engine)
+
 
     useful_element = await scraper.walk_through_native()
     """
@@ -170,6 +175,7 @@ async def main(
                                 StatusTypesEnum.INFO,
                             )
                             db_session.commit()
+
                     continue
 
                 if (

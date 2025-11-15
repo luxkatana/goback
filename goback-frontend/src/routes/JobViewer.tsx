@@ -71,7 +71,9 @@ export default function JobViewer() {
 		<VStack>
 			{job_info && <>
 				<Heading fontSize="6xl" marginTop={10}>
+
 					Job Viewer - {job_info.job_id} {currentstate == -1 && <>- Working on...</>}{currentstate == 3 && <>Failed</>}
+
 				</Heading>
 				<Text fontSize="4xl" marginTop="20px">created at: {new Date(job_info.created_at).toLocaleTimeString()}</Text>
 				<Box border="3px" borderStyle="solid" boxSize="1xl" padding="20px" marginTop="20px">
