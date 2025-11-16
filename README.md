@@ -66,7 +66,7 @@ The default port that docker exposes goback to is ``8000``, if you want to run g
 - "8000:your_desired_port"
 ```
 
-Save and exist, start the container with the previous commands.
+Save and exit, start the container with the previous commands.
 
 ### Running goback without docker
 
