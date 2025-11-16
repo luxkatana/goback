@@ -16,9 +16,9 @@ Goback is based on wayback, but then more simplified, and written in Python, it 
 - Docker & Docker-compose (optional, if you're planning to run using docker)
 - an API key from appwrite (https://appwrite.io/)
 - A storage bucket made within an appwrite project
-- A MySQL server (requuired if you're planning to run it manually)
+- A MySQL server (required if you're planning to run it manually)
 - Node.js 20+ with npm (required if you're planning to run it manually)
-- A computer that atleast can run doom
+- A computer that at least can run doom
 
 ## Running goback
 
@@ -33,7 +33,7 @@ cd goback
 
 Here is how you can collect the required appwrite credentials:
 
-- For ``GOBACK_PROJECT_ID``, go to Overview and then you'll find two buttons, one is the project ID, click on it and it'll automatically put the project ID in your clipboard.
+- For ``GOBACK_PROJECT_ID``, go to Overview and then you'll find two buttons that are next to the name of the project, one is the project ID, another one is the endpoint URL, click on the project ID and it'll automatically put the project ID in your clipboard.
 
 - For ``GOBACK_ENDPOINT_URL``, Is next to the project ID you found above, it is a button with the text "API endpoint", click on it and then it'll put the endpoint url in your clipboard
 
@@ -61,7 +61,12 @@ To stop the container, run
 sudo docker-compose down
 ```
 
-If you want to run goback through a different port, open the ``compose.yaml`` file and head to line 8, change the 2nd 8000 to your desired port 
+The default port that docker exposes goback to is ``8000``, if you want to run goback through a different port, open the ``compose.yaml`` file and head to line 8, change the 2nd 8000 to your desired port so that you'll have 
+```
+- "8000:your_desired_port"
+```
+
+Save and exist, start the container with the previous commands.
 
 ### Running goback without docker
 
@@ -86,3 +91,5 @@ npm i && npm run build  # Install npm dependencies and build the react frontend
 cd ..
 uvicorn webserver:app --host "0.0.0.0" --port 80 # Run the webserver
 ```
+
+Open your browser and head to 127.0.0.1:80 and you'll find the home page of goback
