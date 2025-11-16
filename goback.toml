@@ -1,7 +1,7 @@
 [database]
 db_connection_string = "" # URI that contains your database credentials (e.g mysql://luxkatana:password1234@192.168.1.200:3306/mydatabase)
-use_sqlite_as_fallback_option = true # use sqlite memory as fallback option, in case db_connection_string fails
-sqlite_fallback_filepath = "./_tempfile.db" # sqlite database file-path in case the above field is true (or use :memory: for in-memory database which is not persistent)
+use_sqlite_as_fallback_option = true # use sqlite as fallback option, in case db_connection_string fails
+sqlite_fallback_filepath = "./goback.db" # sqlite database file-path in case the above field is true (or use :memory: for in-memory database which is not persistent)
 
 [appwrite-secrets]
 api_key = "" # usually starts with standard_
