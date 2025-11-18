@@ -1,4 +1,4 @@
-use markup5ever_rcdom::Handle;
+use markup5ever_rcdom::{Handle, RcDom};
 use pyo3::prelude::*;
 #[allow(unused_variables, unused_mut)]
 use std::cell::RefCell;
@@ -8,8 +8,9 @@ fn travel_in_node(node: Handle, useful_marked: Rc<RefCell<Vec<Handle>>>) {
     let binding = Rc::clone(&useful_marked);
     let mut useful_marked_mut = binding.borrow_mut();
     match &node.data {
-        markup5ever_rcdom::NodeData::Element { .. } => {
+        markup5ever_rcdom::NodeData::Element { name, .. } => {
             useful_marked_mut.push(node.clone());
+            dbg!(name);
         }
         _ => {}
     }
@@ -19,6 +20,24 @@ fn travel_in_node(node: Handle, useful_marked: Rc<RefCell<Vec<Handle>>>) {
     }
 }
 
+#[test]
+fn test_travel_in_node() {
+    dbg!("some");
+    use html5ever::{ParseOpts, parse_document, tendril::TendrilSink};
+    let mut file = std::fs::File::open("htmlfile.html").expect("File missing");
+    let marked_attributes: Rc<RefCell<Vec<Handle>>> = Rc::new(RefCell::new(vec![]));
+
+    let document = parse_document(
+        RcDom::default(),
+        ParseOpts {
+            ..Default::default()
+        },
+    )
+    .from_utf8()
+    .read_from(&mut file)
+    .unwrap();
+    travel_in_node(document.document, marked_attributes.clone());
+}
 macro_rules! better_result {
     ($rt: ty,$captured_block: block) => {{
         let normale_result: Result<$rt, Box<dyn std::error::Error>> = $captured_block;
@@ -77,7 +96,6 @@ mod html_parsing_py {
                         }
                     }
                 }
-                dbg!(document.document);
                 Ok(())
             })
         }
