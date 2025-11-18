@@ -13,7 +13,7 @@ fn travel_in_node(node: Handle, useful_marked: Rc<RefCell<Vec<Handle>>>) {
         }
         _ => {}
     }
-    useful_marked_mut.drop();
+    std::mem::drop(useful_marked_mut);
     for child in node.children.borrow().iter() {
         travel_in_node(Rc::clone(child), useful_marked.clone());
     }
@@ -37,7 +37,7 @@ mod html_parsing_py {
     use crate::travel_in_node;
 
     use html5ever::{ParseOpts, parse_document, tendril::TendrilSink};
-    use markup5ever_rcdom::{Handle, RcDom};
+    use markup5ever_rcdom::{Handle, NodeData, RcDom};
     use pyo3::prelude::*;
 
     #[pyclass]
@@ -68,10 +68,16 @@ mod html_parsing_py {
                 .from_utf8()
                 .read_from(&mut self.file)
                 .unwrap();
-                travel_in_node(document.document, marked_attributes.clone());
-                for node in marked_attributes.borrow().iter() {
-                    dbg!(node);
+                travel_in_node(Rc::clone(&document.document), marked_attributes.clone());
+                for node in marked_attributes.borrow_mut().iter_mut() {
+                    if let NodeData::Element { attrs, .. } = &node.data {
+                        let mut attrs = attrs.borrow_mut();
+                        for attribute in attrs.iter_mut() {
+                            attribute.value = "somewhere".into();
+                        }
+                    }
                 }
+                dbg!(document.document);
                 Ok(())
             })
         }
