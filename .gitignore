@@ -25,3 +25,4 @@
 /goback-frontend/*.sln
 /goback-frontend/*.sw?
 /goback.toml
+/goback.db

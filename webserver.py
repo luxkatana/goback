@@ -222,6 +222,8 @@ async def get_jobs(user: user_annotated, db: db_annotated):
 async def get_media(
     file_id: Annotated[str, Path(max_length=32, min_length=32)], db: db_annotated
 ):
+    if file_id == "00000000000000000000000000000000":
+        return {"detail": "Could not load element:("}
     async with AppwriteSession() as session:
         file_fetch_response = await session.get_file_content(
             file_id

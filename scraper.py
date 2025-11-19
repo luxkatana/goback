@@ -11,7 +11,7 @@ from appwrite_session import (
     APPWRITE_ENDPOINT,
     APPWRITE_STORAGE_BUCKET_ID,
 )
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 import asyncio, bs4, httpx
 
 
@@ -145,7 +145,6 @@ async def main(
 
     db_session = Session(db_engine)
 
-
     useful_element = await scraper.walk_through_native()
     """
     if len(useful_element) == 0:
@@ -181,7 +180,11 @@ async def main(
                 if (
                     len(url_check.scheme) == 0 and len(url_check.path) != 0
                 ):  # Doesnt have a scheme, and therefore is something like /here.jpg or here.jpg
-                    url_check = urlparse(url)._replace(query=None, path=url_check.path)
+                    new_url = urlparse(url)._replace(query='').geturl() # Without queries
+                    if new_url.endswith("/") == False:
+                        new_url += '/'
+                    new_url = urljoin(new_url, url_check.path)
+                    url_check = urlparse(new_url)
 
                 try:
                     asset_response, optional_mimetype = (
@@ -193,6 +196,7 @@ async def main(
                         )
                     )
                 except httpx._exceptions.HTTPStatusError as e:
+                    element.attrs[key] = "/media/00000000000000000000000000000000"
                     if user == None:
                         dprint(
                             f"Error when trying to fetch (this element will therefore be skipped) {url_check}\t{e}"
