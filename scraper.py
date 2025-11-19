@@ -136,9 +136,16 @@ class GobackScraper:
 
 
 async def main(
-    url: str, user: User | None = None, job_task: JobTask | None = None
+    url: str,
+    user: User | None = None,
+    job_task: JobTask | None = None,
+    recursive: bool = False,
+    backtrack: list[str] = None,
 ) -> str:
-    dprint("TASK STARTED")
+    if backtrack is None:
+        backtrack = []
+    if recursive == False:
+        dprint("TASK STARTED")
     scraper = GobackScraper(url)
     prepare_dummy_user()
     await scraper.load_html()
@@ -152,8 +159,10 @@ async def main(
         exit(0)
     """
 
+    print("New chance woohoo")
     async with AppwriteSession() as session:
         for attributes, element in useful_element:
+            print(element)
             # an attempt to catch the mime type by html tag
 
             mimetype = findcorresponding_mimetype(element)
@@ -178,21 +187,26 @@ async def main(
                     continue
 
                 if (
-                    len(url_check.scheme) == 0 and len(url_check.path) != 0
+                    len(url_check.scheme) == 0
                 ):  # Doesnt have a scheme, and therefore is something like /here.jpg or here.jpg
-                    new_url = urlparse(url)._replace(query='').geturl() # Without queries
-                    if new_url.endswith("/") == False:
-                        new_url += '/'
-                    new_url = urljoin(new_url, url_check.path)
+                    """
+                    Quick note, /here.jpg and here.jpg ARE NOT THE SAME
+                    for example, if user is in goback.com/foo/bar/nuts.html?krijgteentien=true, and if the document wants:
+                    /here.jpg -> The browser will request to goback.com/here.jpg,
+                    here.jpg -> The browser will request to goback.com/foo/bar/here.jpg
+                    just so you know ^_^
+                    PS: Query parameters also get removed
+                    """
+                    new_url = urlparse(url)._replace(query="").geturl()
+                    new_url = urljoin(new_url, value)
                     url_check = urlparse(new_url)
-
                 try:
                     asset_response, optional_mimetype = (
                         await scraper.request_html_of_link(
                             url_check.geturl(),
                             return_mimetype=(
                                 mimetype == "any"
-                            ),  # A second attempt on obtaining the mime-type by response
+                            ),  # A second attempt on obtaining the mime-type by response this time
                         )
                     )
                 except httpx._exceptions.HTTPStatusError as e:
@@ -214,6 +228,21 @@ async def main(
                 unique_identifier = create_file_identifier(
                     asset_response.text, urlparse(url).hostname
                 )
+                if mimetype.startswith("text/html"):
+
+                    if url_check.geturl() not in backtrack:
+                        backtrack.append(url_check.geturl())
+                        recursed_app_id: str = await main(
+                            url_check.geturl(), user, job_task, True, backtrack
+                        )
+                        element.attrs[key] = f"/media/{recursed_app_id}"
+                        new_asset = AssetMetadata(
+                            file_id=recursed_app_id, mimetype=mimetype
+                        )
+                        db_session.add(new_asset)
+                        db_session.commit()
+                        continue
+
                 try:
                     savedfile = await session.appwrite_publish_media(
                         unique_identifier, asset_response.content
@@ -262,6 +291,8 @@ async def main(
 
         db_session.close()
 
+        if recursive is True:
+            return document_metadata.appwrite_file_id
         if INTERACTIVE_MODE:
             dprint("==========HTML_CONTENT==========")
             dprint(str(scraper.main_html_content))
