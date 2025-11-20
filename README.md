@@ -2,6 +2,8 @@
 
 > What if we could make websites last 4ever?
 
+> Pronounced as ( go : /ˈɡoʊ/ ) ( back : /ˈbæk/ ), it does not contain the following letters: defghijlmnpqrstuvwxyz
+
 ## About the project
 
 I think we all are familiar with the wayback machine, it's a site that makes backups of sites.
