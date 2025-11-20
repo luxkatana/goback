@@ -155,9 +155,7 @@ def get_tomllib_config() -> ConfigurationHolder:
                 "[bold red]Error[/bold red], missing one of the following required environment variables"
             )
             print(
-
                 "GOBACK_KEY, GOBACK_ENDPOINT_URL, GOBACK_PROJECT_ID, GOBACK_STORAGE_BUCKET_ID, GOBACK_MYSQL_URI"
-
             )
             print(
                 "[bold blue]Tip[/bold blue], if you're running goback in a docker container, define the environment variables by passing them with the -e flag or using an .env file."

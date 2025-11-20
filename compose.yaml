@@ -1,7 +1,6 @@
 services:
   goback:
     image: luxkatana/goback:latest
-    restart: no
     depends_on: 
       - db
     ports:
@@ -15,7 +14,6 @@ services:
       GOBACK_STORAGE_BUCKET_ID: ${GOBACK_STORAGE_BUCKET_ID}
   db:
     image: mysql
-    restart: no
     environment:
       MYSQL_RANDOM_ROOT_PASSWORD: yes
       MYSQL_DATABASE: goback

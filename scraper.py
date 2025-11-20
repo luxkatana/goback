@@ -1,17 +1,16 @@
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
-from rich import print
 import hashlib
-
+from rich import print
 from sqlmodel import Session, select
 from appwrite_session import (
     AppwriteSession,
-    create_file_identifier,
+    hash_sha256_to_36,
     insert_site_row,
     APPWRITE_ENDPOINT,
     APPWRITE_STORAGE_BUCKET_ID,
 )
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 import asyncio, bs4, httpx
 
 
@@ -28,7 +27,7 @@ def prepare_dummy_user() -> User:
         usr = session.exec(select(User).where(User.user_id == -1)).first()  # Guest id
         if usr is not None:
             return usr
-        guestusr = User(
+        guestusr = User(  # Fake credentials, don't think these are real, luxkatana.eu doesn't even exist, GITGUARDIAN!!!
             user_id=-1,
             username="Guest user DO NOT DELETE",
             password="iamaguest!!!",
@@ -104,27 +103,6 @@ class GobackScraper:
             )
         )
 
-    # This may be useful in the future, in case we need more complexity
-    """
-    async def walk_through(
-        self, elements: list[PageElement]
-    ) -> list[PageElement] | None:
-        useful_elements = []
-        for element in elements:
-            match type(element):
-
-                case bs4.element.Tag:
-                    element: bs4.element.Tag
-                    if self.get_useful_attributes(element.attrs):  # If it isnt empty
-                        useful_elements.append(element)
-
-                    useful_elements.extend(await self.walk_through(element.children))
-
-                case bs4.element.NavigableString:
-                    ...
-        return useful_elements
-    """
-
     async def request_html_of_link(
         self, url: str, return_mimetype: bool = False
     ) -> tuple[httpx.Response, str]:
@@ -136,63 +114,69 @@ class GobackScraper:
 
 
 async def main(
-    url: str, user: User | None = None, job_task: JobTask | None = None
+    url: str,
+    user: User | None = None,
+    job_task: JobTask | None = None,
+    recursive: bool = False,
+    backtrack: list[str] = None,
 ) -> str:
-    dprint("TASK STARTED")
+    if backtrack is None:
+        backtrack = []
+    if recursive == False:
+        dprint("TASK STARTED")
     scraper = GobackScraper(url)
     prepare_dummy_user()
     await scraper.load_html()
 
     db_session = Session(db_engine)
 
-
-    useful_element = await scraper.walk_through_native()
-    """
-    if len(useful_element) == 0:
-        dprint("Nothing to save")
-        exit(0)
-    """
+    original_summary_of_html = hashlib.sha256(
+        str(scraper.main_html_content).encode()
+    ).hexdigest()
+    useful_elements = await scraper.walk_through_native()
+    if original_summary_of_html in backtrack:  # is already fetched
+        return original_summary_of_html[:36]
 
     async with AppwriteSession() as session:
-        for attributes, element in useful_element:
+        for attributes, element in useful_elements:
             # an attempt to catch the mime type by html tag
-
             mimetype = findcorresponding_mimetype(element)
 
             for key, value in attributes.items():
                 url_check = urlparse(value)
-                if len(url_check.scheme) == 0 and any(
-                    [value.startswith(x) for x in [".", "#"]]
-                ):
-                    if value.startswith("."):  # These are paths such as ./here.jpg
-                        if user == None:
-                            dprint(
-                                f"Scraper doesnt support urls such as {value} and therefore will be ignored"
-                            )
-                        else:
-                            job_task.add_status_message(
-                                f"Scraper doesn't support urls such as {value}. This element will be skipped.",
-                                StatusTypesEnum.INFO,
-                            )
-                            db_session.commit()
-
+                if value.startswith(
+                    "#"
+                ):  # These are usually used to point-out to id's that are on the same page (e.g http://whereismybluetoothtoilet.com#about)
                     continue
 
                 if (
-                    len(url_check.scheme) == 0 and len(url_check.path) != 0
-                ):  # Doesnt have a scheme, and therefore is something like /here.jpg or here.jpg
-                    url_check = urlparse(url)._replace(query=None, path=url_check.path)
+                    len(url_check.scheme) == 0
+                ):  # Doesnt have a scheme, and therefore is something like /here.jpg or here.jpg etc (./blahblah.mp3)
+                    """
+                    Quick note, /here.jpg and here.jpg ARE NOT THE SAME
+                    for example, if user is in goback.com/foo/bar/nuts.html?krijgteentien=true, and if the document wants:
+                    /here.jpg -> The browser will request to goback.com/here.jpg,
+                    here.jpg -> The browser will request to goback.com/foo/bar/here.jpg
+                    ./here.jpg _> browser will rewrite to goback.com/foo/bar/here.jpg
+                    ./../labubu.jpg -> browser will rewrite to goback.com/foo/labubu.jpg
 
+                    just so you know ^_^
+                    PS: Query parameters also get removed
+                    """
+                    new_url = urlparse(url)._replace(query="").geturl()
+                    new_url = urljoin(new_url, value)
+                    url_check = urlparse(new_url)
                 try:
                     asset_response, optional_mimetype = (
                         await scraper.request_html_of_link(
                             url_check.geturl(),
                             return_mimetype=(
                                 mimetype == "any"
-                            ),  # A second attempt on obtaining the mime-type by response
+                            ),  # A second attempt on obtaining the mime-type by fetching the asset this time
                         )
                     )
                 except httpx._exceptions.HTTPStatusError as e:
+                    element.attrs[key] = "/media/000000000000000000000000000000000000"
                     if user == None:
                         dprint(
                             f"Error when trying to fetch (this element will therefore be skipped) {url_check}\t{e}"
@@ -207,56 +191,47 @@ async def main(
 
                 if optional_mimetype is not False:
                     mimetype = optional_mimetype
-                unique_identifier = create_file_identifier(
-                    asset_response.text, urlparse(url).hostname
-                )
+
+                sha256_hash = hash_sha256_to_36(asset_response.content)
+                if mimetype.startswith("text/html"):
+
+                    backtrack.append(original_summary_of_html)
+                    recursed_app_id: str = await main(
+                        url_check.geturl(), user, job_task, True, backtrack
+                    )
+                    element.attrs[key] = f"/media/{recursed_app_id}"
+                    new_asset = AssetMetadata(
+                        file_id=recursed_app_id, mimetype=mimetype
+                    )
+                    db_session.add(new_asset)
+                    db_session.commit()
+                    continue
+
                 try:
-                    savedfile = await session.appwrite_publish_media(
-                        unique_identifier, asset_response.content
+                    await session.appwrite_publish_media(
+                        sha256_hash, asset_response.content
                     )
-                except Exception:
-                    if user == None:
-                        dprint(
-                            "File exists on the server, but I am just going to delete that"
-                        )
-                    else:
-                        job_task.add_status_message(
-                            "File exists on the server, but I am just going to delete that"
-                        )
-                        db_session.commit()
+                except Exception: # Already exists, and sha256 is already unique enough, why bother deleting?
+                    ...
 
-                    md5_hash = hashlib.md5(unique_identifier.encode()).hexdigest()
-                    await session.httpx_client.delete(
-                        f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
-                    )
-                    savedfile = await session.appwrite_publish_media(
-                        unique_identifier, asset_response.content
-                    )
-
-                element.attrs[key] = f"/media/{savedfile.appwrite_file_id}"
-                new_asset = AssetMetadata(
-                    file_id=savedfile.appwrite_file_id, mimetype=mimetype
-                )
+                element.attrs[key] = f"/media/{sha256_hash}"
+                new_asset = AssetMetadata(file_id=sha256_hash, mimetype=mimetype)
                 db_session.add(new_asset)
                 db_session.commit()
 
-        site_document_indentifier = create_file_identifier(
-            str(scraper.main_html_content), url
-        )
+        # Publishing the main site document
+        site_document_indentifier = hash_sha256_to_36(str(scraper.main_html_content))
         try:
-            document_metadata = await session.appwrite_publish_media(
+            await session.appwrite_publish_media(
                 site_document_indentifier, str(scraper.main_html_content).encode()
             )
         except Exception:
-            md5_hash = hashlib.md5(site_document_indentifier.encode()).hexdigest()
-            await session.httpx_client.delete(
-                f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{md5_hash}"
-            )
-            document_metadata = await session.appwrite_publish_media(
-                site_document_indentifier, str(scraper.main_html_content).encode()
-            )
+            ...
 
         db_session.close()
+
+        if recursive is True:
+            return site_document_indentifier
 
         if INTERACTIVE_MODE:
             dprint("==========HTML_CONTENT==========")
@@ -264,20 +239,19 @@ async def main(
             dprint("================================")
 
             dprint(
-                "file id to access with through appwrite:",
-                document_metadata.appwrite_file_id,
+                "file id to access with through appwrite:", site_document_indentifier
             )
             dprint(
-                f"To access this page, run the webserver using uvicorn, or docker, and then go to <webserver_socket>/media/{document_metadata.appwrite_file_id}"
+                f"To access this page, run the webserver using uvicorn, or docker, and then go to <webserver_socket>/media/{site_document_indentifier}"
             )
         else:
             dprint(f"TASK FINISHED FROM USER {user.username}")
         await insert_site_row(
             url,
-            document_metadata.appwrite_file_id,
+            site_document_indentifier,
             -1 if user is None else user.user_id,
         )
-        return document_metadata.appwrite_file_id
+        return site_document_indentifier
 
 
 if (
