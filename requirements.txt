@@ -11,3 +11,4 @@ python-dotenv
 python-multipart
 rich
 uvicorn[standard]
+cryptography
