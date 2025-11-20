@@ -10,14 +10,22 @@ Goback is based on wayback, but then more simplified, and written in Python, it 
 
 **This project was made for a computer science assignment**
 
-## Requirements to run this project
-- Python3
-- Git
-- Docker & Docker-compose (optional, if you're planning to run using docker)
+## Requirements to run this project using docker
+
+- Docker
+- Docker-compose
 - an API key from appwrite (https://appwrite.io/)
 - A storage bucket made within an appwrite project
 - A MySQL server (required if you're planning to run it manually)
-- Node.js 20+ with npm (required if you're planning to run it manually)
+- A computer that at least can run doom
+
+## Requirements to run this project manually (without docker)
+- Python3 
+- Git
+- an API key from appwrite (https://appwrite.io/)
+- A storage bucket made within an appwrite project
+- A MySQL server (or any SQL server)
+- Node.js 20+ with npm
 - A computer that at least can run doom
 
 ## Running goback
