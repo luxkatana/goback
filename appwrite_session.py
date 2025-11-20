@@ -1,7 +1,7 @@
-from hashlib import md5, sha256
 from io import BytesIO
 
 from sqlmodel import Session
+from hashlib import sha256
 from models import SitesMetadata, db_engine
 from config_manager import get_tomllib_config, validate_appwrite_credentials
 import httpx
@@ -15,6 +15,12 @@ APPWRITE_STORAGE_BUCKET_ID = holder.storage_bucket_id
 validate_appwrite_credentials(holder)
 
 
+def hash_sha256_to_36(content: bytes | str) -> str:
+    return sha256(
+        content if isinstance(content, bytes) else content.encode()
+    ).hexdigest()[:36]
+
+
 async def insert_site_row(site_url: str, document_file_id: str, user_id: int = -1):
     with Session(db_engine) as db_session:
         new_metadata = SitesMetadata(
@@ -22,26 +28,6 @@ async def insert_site_row(site_url: str, document_file_id: str, user_id: int = -
         )
         db_session.add(new_metadata)
         db_session.commit()
-
-
-def create_file_identifier(file_content: str, host_url: str) -> str:
-    """
-    Maakt een naam/identifier voor een bepaalde media.
-    Is gebasseerd op het volgende formaat:
-        <sha256hash(file_content)_<sha256hash(host_url)>>
-
-    De reden waarom we de file_content nemen, is om elke media te "identificeren" dmv de sha256 hash
-    """
-    file_content_sha256 = sha256(file_content.encode()).hexdigest()
-    host_url_sha256 = sha256(host_url.encode()).hexdigest()
-    return f"{file_content_sha256}_{host_url_sha256}"
-
-
-class SavedFile:
-    def __init__(self, file_identifier: str, appwrite_file_id: str):
-        self.file_identifier = file_identifier
-        self.appwrite_file_id = appwrite_file_id
-        self.httpx_client: httpx.AsyncClient | None = None
 
 
 class AppwriteSession:
@@ -62,30 +48,19 @@ class AppwriteSession:
 
     async def appwrite_publish_media(
         self, file_identifier: str, file_content: bytes
-    ) -> SavedFile:
-
+    ) -> None:
         with BytesIO() as io:
             io.write(file_content)
-            md5_file_id = md5(file_identifier.encode()).hexdigest()
-
             response = await self.httpx_client.post(
                 f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files",
-                data={"fileId": md5_file_id},
+                data={"fileId": file_identifier},
                 files={"file": (file_identifier, io, "text/plain")},
             )
-
             response.raise_for_status()
-            """self.storage.create_file(
-                APPWRITE_STORAGE_BUCKET_ID,
-                md5_file_id,
-                InputFile.from_bytes(file_content.encode(), file_identifier),
-            )"""
-
-            return SavedFile(file_identifier, md5_file_id)
 
     async def get_file_content(self, appwrite_file_id: str) -> bytes:
 
         response = await self.httpx_client.get(
             f"{APPWRITE_ENDPOINT}/storage/buckets/{APPWRITE_STORAGE_BUCKET_ID}/files/{appwrite_file_id}/download"
         )
-        return response.content
+        return response.raise_for_status().content

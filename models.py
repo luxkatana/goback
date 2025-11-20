@@ -56,7 +56,7 @@ class User(SQLModel, table=True):
 class AssetMetadata(SQLModel, table=True):
     __tablename__ = "goback_assets_metadata"
     asset_id: int | None = Field(primary_key=True)
-    file_id: str = Field(nullable=False, max_length=38)
+    file_id: str = Field(nullable=False, max_length=36)
     mimetype: str = Field(default="any")
 
 
@@ -80,7 +80,9 @@ class JobTask(SQLModel, table=True):
     created_at: datetime
     status_messages: bytes = Field()  # list[Status]
 
-    def add_status_message(self, message: str, statustype: StatusTypesEnum = StatusTypesEnum.INFO):
+    def add_status_message(
+        self, message: str, statustype: StatusTypesEnum = StatusTypesEnum.INFO
+    ):
         deserialized: list[Status] = pickle.loads(self.status_messages)
         deserialized.append(Status(message=message, status_type=statustype))
         self.status_messages = pickle.dumps(deserialized)
