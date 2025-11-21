@@ -117,6 +117,7 @@ async def main(
     recursive: bool = False,
     asset_cache: AssetsCache = None,
 ) -> str:
+    print(f'Requesting for {url}')
     if asset_cache == None:
         asset_cache = AssetsCache.build_new_cache(True)
 
@@ -133,8 +134,16 @@ async def main(
     ).hexdigest()
     useful_elements = await scraper.walk_through_native()
     if asset_cache.exists(original_summary_of_html):
-        dprint("Cached from cache :D -> ", url)
-        return asset_cache.get_truncated_hash(original_summary_of_html)
+        cached = asset_cache.get_truncated_hash(original_summary_of_html)
+        if recursive is True:
+            dprint("Cached from cache :D -> ", url)
+            return cached
+        else:
+            dprint("Found site in cache")
+            dprint(
+                f"To access this page, run the webserver using uvicorn, or docker, and then go to <webserver_socket>/media/{cached}"
+            )
+            return cached
 
     async with AppwriteSession() as session:
         for attributes, element in useful_elements:
@@ -232,7 +241,6 @@ async def main(
         site_document_indentifier = hash_sha256_to_36(str(scraper.main_html_content))
 
         asset_cache.add_to_cache(original_summary_of_html, site_document_indentifier)
-
         try:
             await session.appwrite_publish_media(
                 site_document_indentifier, str(scraper.main_html_content).encode()
