@@ -7,8 +7,7 @@ from appwrite_session import (
     AppwriteSession,
     hash_sha256_to_36,
     insert_site_row,
-    APPWRITE_ENDPOINT,
-    APPWRITE_STORAGE_BUCKET_ID,
+    AssetsCache,
 )
 from urllib.parse import urljoin, urlparse
 import asyncio, bs4, httpx
@@ -30,8 +29,8 @@ def prepare_dummy_user() -> User:
         guestusr = User(  # Fake credentials, don't think these are real, luxkatana.eu doesn't even exist, GITGUARDIAN!!!
             user_id=-1,
             username="Guest user DO NOT DELETE",
-            password="iamaguest!!!",
-            email="someguests@luxkatana.eu",
+            password="notarealpassword!!!",
+            email="notarealemail@notreal.info",
         )
         session.add(guestusr)
         session.commit()
@@ -39,11 +38,9 @@ def prepare_dummy_user() -> User:
 
 
 def findcorresponding_mimetype(element: PageElement) -> str:
-    match element.name:
-        case "script":
-            return "application/javascript"
-
-    if element.name == "link" and "stylesheet" in element.attrs.get("rel", []):
+    if element.name == "script":
+        return "application/javascript"
+    elif element.name == "link" and "stylesheet" in element.attrs.get("rel", []):
         return "text/css"
 
     return "any"
@@ -118,10 +115,11 @@ async def main(
     user: User | None = None,
     job_task: JobTask | None = None,
     recursive: bool = False,
-    backtrack: list[str] = None,
+    asset_cache: AssetsCache = None,
 ) -> str:
-    if backtrack is None:
-        backtrack = []
+    if asset_cache == None:
+        asset_cache = AssetsCache.build_new_cache(True)
+
     if recursive == False:
         dprint("TASK STARTED")
     scraper = GobackScraper(url)
@@ -134,8 +132,9 @@ async def main(
         str(scraper.main_html_content).encode()
     ).hexdigest()
     useful_elements = await scraper.walk_through_native()
-    if original_summary_of_html in backtrack:  # is already fetched
-        return original_summary_of_html[:36]
+    if asset_cache.exists(original_summary_of_html):
+        dprint("Cached from cache :D -> ", url)
+        return asset_cache.get_truncated_hash(original_summary_of_html)
 
     async with AppwriteSession() as session:
         for attributes, element in useful_elements:
@@ -177,6 +176,9 @@ async def main(
                     )
                 except httpx._exceptions.HTTPStatusError as e:
                     element.attrs[key] = "/media/000000000000000000000000000000000000"
+                    asset_cache.add_to_cache(
+                        original_summary_of_html, "000000000000000000000000000000000000"
+                    )
                     if user == None:
                         dprint(
                             f"Error when trying to fetch (this element will therefore be skipped) {url_check}\t{e}"
@@ -195,13 +197,14 @@ async def main(
                 sha256_hash = hash_sha256_to_36(asset_response.content)
                 if mimetype.startswith("text/html"):
 
-                    backtrack.append(original_summary_of_html)
                     recursed_app_id: str = await main(
-                        url_check.geturl(), user, job_task, True, backtrack
+                        url_check.geturl(), user, job_task, True, asset_cache
                     )
                     element.attrs[key] = f"/media/{recursed_app_id}"
                     new_asset = AssetMetadata(
-                        file_id=recursed_app_id, mimetype=mimetype
+                        file_id=recursed_app_id,
+                        mimetype=mimetype,
+                        original_asset_html=original_summary_of_html,
                     )
                     db_session.add(new_asset)
                     db_session.commit()
@@ -211,16 +214,25 @@ async def main(
                     await session.appwrite_publish_media(
                         sha256_hash, asset_response.content
                     )
-                except Exception: # Already exists, and sha256 is already unique enough, why bother deleting?
+                except (
+                    Exception
+                ):  # Already exists, and sha256 is already unique enough, why bother deleting?
                     ...
 
                 element.attrs[key] = f"/media/{sha256_hash}"
-                new_asset = AssetMetadata(file_id=sha256_hash, mimetype=mimetype)
+                new_asset = AssetMetadata(
+                    file_id=sha256_hash,
+                    mimetype=mimetype,
+                    original_asset_html=original_summary_of_html,
+                )
                 db_session.add(new_asset)
                 db_session.commit()
 
-        # Publishing the main site document
+        # Publishing the main root document (the whole damn rewrited HTML document)
         site_document_indentifier = hash_sha256_to_36(str(scraper.main_html_content))
+
+        asset_cache.add_to_cache(original_summary_of_html, site_document_indentifier)
+
         try:
             await session.appwrite_publish_media(
                 site_document_indentifier, str(scraper.main_html_content).encode()
