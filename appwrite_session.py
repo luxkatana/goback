@@ -1,9 +1,10 @@
 from io import BytesIO
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 from hashlib import sha256
-from models import SitesMetadata, db_engine
+from models import SitesMetadata, db_engine, AssetMetadata
 from config_manager import get_tomllib_config, validate_appwrite_credentials
+from rich import print
 import httpx
 
 holder = get_tomllib_config()
@@ -13,6 +14,39 @@ APPWRITE_ENDPOINT = holder.endpoint_url
 APPWRITE_PROJECT_ID = holder.project_id
 APPWRITE_STORAGE_BUCKET_ID = holder.storage_bucket_id
 validate_appwrite_credentials(holder)
+
+
+class AssetsCache:
+    @classmethod
+    def build_new_cache(cls, from_db: bool = False) -> "AssetsCache":
+        builded_cache = cls()
+        if from_db is True:
+            with Session(db_engine) as db_session:
+                result: list[AssetMetadata] = db_session.exec(
+                    select(AssetMetadata)
+                ).all()
+                builded_cache.cache = {
+                    item.original_asset_html: item.file_id for item in result
+                }
+                print(f"Dynamic cache loaded (contains {len(result)} entries) ")
+
+        return builded_cache
+
+    def __init__(self, existing: dict[str, str] = None) -> None:
+        self.cache: dict[str, str] = existing or {}
+
+    @property
+    def empty(self) -> bool:
+        return len(self.cache.keys()) == 0
+
+    def get_truncated_hash(self, original_file_id: str) -> str | None:
+        return self.cache[original_file_id]
+
+    def add_to_cache(self, original_hash: str, truncated_hash: str):
+        self.cache[original_hash] = truncated_hash
+
+    def exists(self, original_hash: str) -> bool:
+        return isinstance(self.cache.get(original_hash, None), str)
 
 
 def hash_sha256_to_36(content: bytes | str) -> str:
