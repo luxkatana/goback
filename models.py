@@ -56,6 +56,7 @@ class User(SQLModel, table=True):
 class AssetMetadata(SQLModel, table=True):
     __tablename__ = "goback_assets_metadata"
     asset_id: int | None = Field(primary_key=True)
+    original_asset_html: str = Field(nullable=False, max_length=64)
     file_id: str = Field(nullable=False, max_length=36)
     mimetype: str = Field(default="any")
 

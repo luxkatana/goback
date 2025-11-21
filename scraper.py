@@ -120,7 +120,7 @@ async def main(
     asset_cache: AssetsCache = None,
 ) -> str:
     if asset_cache == None:
-        asset_cache = AssetsCache()
+        asset_cache = AssetsCache.build_new_cache(True)
 
     if recursive == False:
         dprint("TASK STARTED")
@@ -204,7 +204,9 @@ async def main(
                     )
                     element.attrs[key] = f"/media/{recursed_app_id}"
                     new_asset = AssetMetadata(
-                        file_id=recursed_app_id, mimetype=mimetype
+                        file_id=recursed_app_id,
+                        mimetype=mimetype,
+                        original_asset_html=original_summary_of_html,
                     )
                     db_session.add(new_asset)
                     db_session.commit()
@@ -220,7 +222,11 @@ async def main(
                     ...
 
                 element.attrs[key] = f"/media/{sha256_hash}"
-                new_asset = AssetMetadata(file_id=sha256_hash, mimetype=mimetype)
+                new_asset = AssetMetadata(
+                    file_id=sha256_hash,
+                    mimetype=mimetype,
+                    original_asset_html=original_summary_of_html,
+                )
                 db_session.add(new_asset)
                 db_session.commit()
 
