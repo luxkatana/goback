@@ -15,6 +15,24 @@ APPWRITE_STORAGE_BUCKET_ID = holder.storage_bucket_id
 validate_appwrite_credentials(holder)
 
 
+class AssetsCache:
+    def __init__(self, existing: dict[str, str] = None) -> None:
+        self.cache: dict[str, str] = existing or {}
+
+    @property
+    def empty(self) -> bool:
+        return len(self.cache.keys()) == 0
+
+    def get_truncated_hash(self, original_file_id: str) -> str | None:
+        return self.cache[original_file_id]
+
+    def add_to_cache(self, original_hash: str, truncated_hash: str):
+        self.cache[original_hash] = truncated_hash
+
+    def exists(self, original_hash: str) -> bool:
+        return isinstance(self.cache.get(original_hash, None), str)
+
+
 def hash_sha256_to_36(content: bytes | str) -> str:
     return sha256(
         content if isinstance(content, bytes) else content.encode()
