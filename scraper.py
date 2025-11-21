@@ -38,11 +38,9 @@ def prepare_dummy_user() -> User:
 
 
 def findcorresponding_mimetype(element: PageElement) -> str:
-    match element.name:
-        case "script":
-            return "application/javascript"
-
-    if element.name == "link" and "stylesheet" in element.attrs.get("rel", []):
+    if element.name == "script":
+        return "application/javascript"
+    elif element.name == "link" and "stylesheet" in element.attrs.get("rel", []):
         return "text/css"
 
     return "any"

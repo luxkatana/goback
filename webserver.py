@@ -156,7 +156,8 @@ class ScrapeUrlPayload(BaseModel):
 @app.post("/api/scrape", status_code=status.HTTP_202_ACCEPTED)
 async def scrape_site_route(
     db: db_annotated, user: user_annotated, url_payload: ScrapeUrlPayload
-):  # TODO: url regex
+
+):
     new_job = JobTask(
         user_id=user.user_id,
         created_at=datetime.datetime.now(),
