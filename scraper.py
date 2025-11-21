@@ -29,8 +29,8 @@ def prepare_dummy_user() -> User:
         guestusr = User(  # Fake credentials, don't think these are real, luxkatana.eu doesn't even exist, GITGUARDIAN!!!
             user_id=-1,
             username="Guest user DO NOT DELETE",
-            password="iamaguest!!!",
-            email="someguests@luxkatana.eu",
+            password="notarealpassword!!!",
+            email="notarealemail@notreal.info",
         )
         session.add(guestusr)
         session.commit()
@@ -135,6 +135,7 @@ async def main(
     ).hexdigest()
     useful_elements = await scraper.walk_through_native()
     if asset_cache.exists(original_summary_of_html):
+        dprint("Cached from cache :D -> ", url)
         return asset_cache.get_truncated_hash(original_summary_of_html)
 
     async with AppwriteSession() as session:
