@@ -241,6 +241,7 @@ async def main(
         site_document_indentifier = hash_sha256_to_36(str(scraper.main_html_content))
 
         asset_cache.add_to_cache(original_summary_of_html, site_document_indentifier)
+
         try:
             await session.appwrite_publish_media(
                 site_document_indentifier, str(scraper.main_html_content).encode()
