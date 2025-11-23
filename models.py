@@ -26,7 +26,18 @@ class StatusTypesEnum(Enum):
     INFO = 1
     ERROR = 2
     FAILED = 3
-
+    def __repr__(self) -> str:
+        return self.__str__()
+    def __str__(self) -> str:
+        match self.value:
+            case 0:
+                return "Status-Success"
+            case 1:
+                return "Status-Info"
+            case 2:
+                return "Status-Error"
+            case 3:
+                return "Status-Failed"
 
 def get_db_session():
     try:

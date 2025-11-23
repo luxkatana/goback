@@ -125,9 +125,10 @@ async def job_status_route(job_id: int, user: user_annotated, db: db_annotated):
     return response
 
 
-def task_handler(user_id: int, job_id: int, url: str):
+def task_handler(user_id: int, job_id: int, url: str) -> bool:
     with Session(db_engine) as db:
         user = db.exec(select(User).where(User.user_id == user_id)).first()
+        is_ok = False
         job = db.exec(select(JobTask).where(JobTask.job_id == job_id)).first()
         try:
             file_id = asyncio.run(scrape_site(url, user, job))
@@ -146,8 +147,9 @@ def task_handler(user_id: int, job_id: int, url: str):
             job.add_status_message(str(e), StatusTypesEnum.ERROR)
         else:
             job.add_status_message(file_id, StatusTypesEnum.SUCCESS)
+            is_ok = True
         db.commit()
-
+        return is_ok
 
 class ScrapeUrlPayload(BaseModel):
     url: HttpUrl = Field(max_length=100)
