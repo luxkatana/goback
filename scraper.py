@@ -1,7 +1,11 @@
+from datetime import datetime
+import pickle
 from bs4.element import PageElement
 from bs4 import BeautifulSoup
-import hashlib
+from html2text import html2text
 from rich import print
+from rich.pretty import pprint
+from rich.markdown import Markdown
 from sqlmodel import Session, select
 from appwrite_session import (
     AppwriteSession,
@@ -10,12 +14,21 @@ from appwrite_session import (
     AssetsCache,
 )
 from urllib.parse import urljoin, urlparse
-import asyncio, bs4, httpx
 
 
-from models import AssetMetadata, JobTask, StatusTypesEnum, User, db_engine
-
+from models import (
+    AssetMetadata,
+    JobTask,
+    StatusTypesEnum,
+    User,
+    db_engine,
+    hasher,
+    Status,
+)
 from config_manager import get_tomllib_config, ConfigurationHolder
+import hashlib
+import webserver
+import bs4, httpx
 
 conf_holder: ConfigurationHolder = get_tomllib_config()
 URL_TAGS = frozenset(("href", "src"))
@@ -29,7 +42,7 @@ def prepare_dummy_user() -> User:
         guestusr = User(  # Fake credentials, don't think these are real, luxkatana.eu doesn't even exist, GITGUARDIAN!!!
             user_id=-1,
             username="Guest user DO NOT DELETE",
-            password="notarealpassword!!!",
+            password=hasher.hash("notarealpassword!!!"),
             email="notarealemail@notreal.info",
         )
         session.add(guestusr)
@@ -47,15 +60,6 @@ def findcorresponding_mimetype(element: PageElement) -> str:
 
 
 APPWRITE_KEY = conf_holder.api_key
-
-INTERACTIVE_MODE = __name__ == "__main__"
-
-
-def dprint(*args, **kwargs) -> None:
-    if INTERACTIVE_MODE:
-        print(*args, **kwargs)
-    else:
-        print(f"[blue bold][FROM WEBSERVER DBG MESSAGES][/blue bold]", *args, **kwargs)
 
 
 class GobackScraper:
@@ -112,19 +116,19 @@ class GobackScraper:
 
 async def main(
     url: str,
-    user: User | None = None,
+    user: User,
     job_task: JobTask | None = None,
     recursive: bool = False,
     asset_cache: AssetsCache = None,
 ) -> str:
-    print(f'Requesting for {url}')
+    INTERACTIVE_MODE = user.user_id == -1
+    print(f"Requesting for {url}")
     if asset_cache == None:
         asset_cache = AssetsCache.build_new_cache(True)
 
     if recursive == False:
-        dprint("TASK STARTED")
+        print("TASK STARTED")
     scraper = GobackScraper(url)
-    prepare_dummy_user()
     await scraper.load_html()
 
     db_session = Session(db_engine)
@@ -136,11 +140,11 @@ async def main(
     if asset_cache.exists(original_summary_of_html):
         cached = asset_cache.get_truncated_hash(original_summary_of_html)
         if recursive is True:
-            dprint("Cached from cache :D -> ", url)
+            print("Cached from cache :D -> ", url)
             return cached
         else:
-            dprint("Found site in cache")
-            dprint(
+            print("Found site in cache")
+            print(
                 f"To access this page, run the webserver using uvicorn, or docker, and then go to <webserver_socket>/media/{cached}"
             )
             return cached
@@ -189,7 +193,7 @@ async def main(
                         original_summary_of_html, "000000000000000000000000000000000000"
                     )
                     if user == None:
-                        dprint(
+                        print(
                             f"Error when trying to fetch (this element will therefore be skipped) {url_check}\t{e}"
                         )
                     else:
@@ -225,7 +229,7 @@ async def main(
                     )
                 except (
                     Exception
-                ):  # Already exists, and sha256 is already unique enough, why bother deleting?
+                ):  # Already exists, and sha256 is already unique enough, why bother deleting the old media if you just can "recycle"?
                     ...
 
                 element.attrs[key] = f"/media/{sha256_hash}"
@@ -255,36 +259,47 @@ async def main(
             return site_document_indentifier
 
         if INTERACTIVE_MODE:
-            dprint("==========HTML_CONTENT==========")
-            dprint(str(scraper.main_html_content))
-            dprint("================================")
+            print("==========THE PAGE==========\n\n")
+            print(Markdown(html2text(str(scraper.main_html_content))))
+            print("================================\n=n")
 
-            dprint(
-                "file id to access with through appwrite:", site_document_indentifier
-            )
-            dprint(
+            print(
                 f"To access this page, run the webserver using uvicorn, or docker, and then go to <webserver_socket>/media/{site_document_indentifier}"
             )
-        else:
-            dprint(f"TASK FINISHED FROM USER {user.username}")
-        await insert_site_row(
-            url,
-            site_document_indentifier,
-            -1 if user is None else user.user_id,
-        )
+        await insert_site_row(url, site_document_indentifier, user.user_id)
         return site_document_indentifier
 
 
 if (
-    INTERACTIVE_MODE
+    __name__ == "__main__"
 ):  # Directly ran using the python3 interpreter, prevents accidental runs for example as importing this module
-    url = input("Enter url to retrieve (live mode or something): ")
-    url = (
-        "https://cooletaseen.hondsrugcollege.com/document_img.html"
-        if url == ""
-        else url
-    )  # Test url
+    url = input("Enter url (Interactive mode): ")
+    url = "https://cooletaseen.hondsrugcollege.com" if url == "" else url  # Default url
 
     if not url.startswith("http"):
         url = f"http://{url}"
-    asyncio.run(main(url))
+
+    usr = prepare_dummy_user()
+    with Session(db_engine) as session:
+        newjob = JobTask(
+            user_id=-1,
+            created_at=datetime.now(),
+            status_messages=pickle.dumps(
+                [
+                    Status(
+                        message="Interactive Job started",
+                        status_type=StatusTypesEnum.INFO,
+                    )
+                ]
+            ),
+        )
+        session.add(newjob)
+        session.commit()
+        status_task = webserver.task_handler(-1, newjob.job_id, url)
+        session.refresh(newjob)
+        if status_task is False:  # Error
+            print("There were some errors while running the request, have a look")
+            pprint(pickle.loads(newjob.status_messages), expand_all=True)
+            exit(1)
+
+        pprint(pickle.loads(newjob.status_messages), expand_all=True)
