@@ -10,7 +10,6 @@ from sqlmodel import Session, select
 from appwrite_session import (
     AppwriteSession,
     hash_sha256_to_36,
-    insert_site_row,
     AssetsCache,
 )
 from urllib.parse import urljoin, urlparse
@@ -251,6 +250,14 @@ async def main(
 
         # Publishing the main root document (the whole damn rewrited HTML document)
         site_document_indentifier = hash_sha256_to_36(str(scraper.main_html_content))
+        db_session.add(
+            AssetMetadata(
+                file_id=site_document_indentifier,
+                original_asset_html=original_summary_of_html,
+                mimetype="text/html",
+            )
+        )
+        db_session.commit()
 
         asset_cache.add_to_cache(original_summary_of_html, site_document_indentifier)
 
@@ -272,7 +279,6 @@ async def main(
             print(
                 f"To access this page, run the webserver using uvicorn, or docker, and then go to <webserver_socket>/media/{site_document_indentifier}"
             )
-        await insert_site_row(url, site_document_indentifier, user.user_id)
         return site_document_indentifier
 
 
@@ -310,4 +316,11 @@ if (
             pprint(pickle.loads(newjob.status_messages), expand_all=True)
             exit(1)
 
+        if (
+            input(
+                "Do you want to see the log messages? (the pickle-serialized ones) (yes/no)"
+            ).lower()
+            == "no"
+        ):
+            exit(0)
         pprint(pickle.loads(newjob.status_messages), expand_all=True)

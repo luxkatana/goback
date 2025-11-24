@@ -2,7 +2,7 @@ from io import BytesIO
 
 from sqlmodel import Session, select
 from hashlib import sha256
-from models import SitesMetadata, db_engine, AssetMetadata
+from models import db_engine, AssetMetadata
 from config_manager import get_tomllib_config, validate_appwrite_credentials
 from rich import print
 import httpx
@@ -53,15 +53,6 @@ def hash_sha256_to_36(content: bytes | str) -> str:
     return sha256(
         content if isinstance(content, bytes) else content.encode()
     ).hexdigest()[:36]
-
-
-async def insert_site_row(site_url: str, document_file_id: str, user_id: int = -1):
-    with Session(db_engine) as db_session:
-        new_metadata = SitesMetadata(
-            site_url=site_url, document_file_id=document_file_id, user_id=user_id
-        )
-        db_session.add(new_metadata)
-        db_session.commit()
 
 
 class AppwriteSession:

@@ -72,12 +72,6 @@ class AssetMetadata(SQLModel, table=True):
     mimetype: str = Field(default="any")
 
 
-class SitesMetadata(SQLModel, table=True):
-    __tablename__ = "goback_sites_metadata"
-    site_id: int | None = Field(primary_key=True)
-    user_id: int = Field(foreign_key="goback_users.user_id", default=-1)
-    site_url: str
-    document_file_id: str
 
 
 class Status(BaseModel):

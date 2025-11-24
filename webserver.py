@@ -173,7 +173,8 @@ async def scrape_site_route(
     db.commit()
 
     Thread(
-        target=task_handler, args=(user.user_id, new_job.job_id, str(url_payload.url), Session(db_engine))
+        target=task_handler,
+        args=(user.user_id, new_job.job_id, str(url_payload.url), Session(db_engine)),
     ).start()
     return {"job_id": new_job.job_id}
 
