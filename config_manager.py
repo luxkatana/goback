@@ -8,13 +8,6 @@ import httpx
 from typing import Any
 
 load_dotenv()
-global VALIDATION_COUNT
-VALIDATION_COUNT: int = 0
-
-
-def mprint(*args, **kwargs):
-    if VALIDATION_COUNT < 3:
-        print(*args, **kwargs)
 
 
 class ConfigurationHolder:
@@ -39,8 +32,6 @@ class ConfigurationHolder:
 def get_working_database_string(
     config: ConfigurationHolder, debug_info: bool = True
 ) -> str:
-    global VALIDATION_COUNT
-    VALIDATION_COUNT += 1
     main_uri = config.db_connection_string
     secondary_uri = config.sqlite_fallback_filepath
     use_sqlite_as_second_option = config.use_sqlite_as_fallback_option
@@ -51,17 +42,15 @@ def get_working_database_string(
     except Exception as e:
         if use_sqlite_as_second_option is True:
             if debug_info is True:
-                mprint(
+                print(
                     f"[yellow bold]WARNING[/yellow bold]: main uri ({main_uri}) does not work ({e})"
                 )
-                mprint("[white]-> Using sqlite as fallback option[/white]")
+                print("[white]-> Using sqlite as fallback option[/white]")
             return f"sqlite:///{secondary_uri}"
         raise e
 
 
 def validate_appwrite_credentials(holder: ConfigurationHolder):
-    global VALIDATION_COUNT
-    VALIDATION_COUNT += 1
     endpoint_url = holder.endpoint_url
     api_key = holder.api_key
     project_id = holder.project_id
@@ -71,7 +60,7 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
     }
     storage_bucket_id = holder.storage_bucket_id
     if None in (endpoint_url, api_key, project_id, storage_bucket_id):
-        mprint(
+        print(
             "[red bold]ERROR[/red bold]: Missing some valid appwrite variables (possibly some info is missing, check the default template in the github repo)"
         )
         exit(1)
@@ -79,7 +68,7 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
     if not endpoint_url.startswith(
         "http"
     ):  # Not a valid url, dumb checking but it works
-        mprint(
+        print(
             "[red bold]ERROR[/red bold]: Appwrite URL endpoint is invalid, perhaps it's not starting with http or https:// "
         )
         exit(1)
@@ -96,20 +85,20 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
         # 409 already exists
         if response.status_code == 401:
             if response.json()["type"] == "user_unauthorized":
-                mprint(
+                print(
                     "[red bold]ERROR[/red bold]: API key is invalid (api_key field in goback.toml)"
                 )
             elif response.json()["type"] == "general_unauthorized_scope":
-                mprint(
+                print(
                     "[red bold]ERROR[/red bold]: missing scopes, make sure that the api key has the files.read and files.write scopes enabled"
                 )
 
             exit(1)
         if response.status_code == 404:
             if response.json()["type"] == "project_not_found":
-                mprint("[red bold]ERROR[/red bold]: Project ID is invalid")
+                print("[red bold]ERROR[/red bold]: Project ID is invalid")
             elif response.json()["type"] == "storage_bucket_not_found":
-                mprint("[red bold]ERROR[/red bold]: Storage bucket is invalid")
+                print("[red bold]ERROR[/red bold]: Storage bucket is invalid")
 
             exit(1)
 
@@ -121,7 +110,7 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
             response.status_code == 401
             and response.json()["type"] == "general_unauthorized_scope"
         ):
-            mprint(
+            print(
                 "[red bold]ERROR[/red bold]: missing scopes, make sure that the api key has the files.read and files.write scopes enabled"
             )
             exit(1)
@@ -130,21 +119,19 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
             f"{endpoint_url}/storage/buckets/{storage_bucket_id}/files/validationifcredentialsareok",
             headers=headers,
         ).raise_for_status()
-        mprint(
+        print(
             ":tada: Appwrite credentials validations passed :white_check_mark: :tada:"
         )
 
 
 def get_tomllib_config() -> ConfigurationHolder:
-    global VALIDATION_COUNT
-    VALIDATION_COUNT += 1
     config_holder = ConfigurationHolder()
 
     try:
         with open("./goback.toml", "rb") as file:
             configuration = tomllib.load(file)
     except FileNotFoundError:
-        mprint(
+        print(
             "[bold yellow]Warning[/bold yellow], using environment variables, because goback.toml is missing"
         )
         try:  # In docker/environment var mode
@@ -164,18 +151,18 @@ def get_tomllib_config() -> ConfigurationHolder:
                 storage_bucket_id=storage_bucket_id,
             )
         except KeyError:
-            mprint(
+            print(
                 "[bold red]Error[/bold red], missing one of the following required environment variables"
             )
-            mprint(
+            print(
                 "GOBACK_KEY, GOBACK_ENDPOINT_URL, GOBACK_PROJECT_ID, GOBACK_STORAGE_BUCKET_ID, GOBACK_MYSQL_URI"
             )
-            mprint(
+            print(
                 "[bold blue]Tip[/bold blue], if you're running goback in a docker container, define the environment variables by passing them with the -e flag or using an .env file."
             )
             exit(1)
 
-    mprint("Using goback.toml")
+    print("Using goback.toml")
     for sections in configuration.values():
         for inner_key in sections:
             inner_val = sections[inner_key]

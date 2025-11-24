@@ -117,39 +117,44 @@ class GobackScraper:
 async def main(
     url: str,
     user: User,
-    job_task: JobTask | None = None,
+    job_task: JobTask,
+    db_session: Session,
     recursive: bool = False,
     asset_cache: AssetsCache = None,
 ) -> str:
+
+    def sprint(message: str, t: StatusTypesEnum = StatusTypesEnum.INFO):
+        print(f"[bold blue][{user.username}][/bold blue]: [italic]{message}[/italic]")
+        job_task.add_status_message(message, t)
+        db_session.commit()
+
     INTERACTIVE_MODE = user.user_id == -1
-    print(f"Requesting for {url}")
+    sprint(f"Requesting for {url}")
     if asset_cache == None:
         asset_cache = AssetsCache.build_new_cache(True)
 
-    if recursive == False:
-        print("TASK STARTED")
     scraper = GobackScraper(url)
     await scraper.load_html()
-
-    db_session = Session(db_engine)
 
     original_summary_of_html = hashlib.sha256(
         str(scraper.main_html_content).encode()
     ).hexdigest()
     useful_elements = await scraper.walk_through_native()
+
     if asset_cache.exists(original_summary_of_html):
         cached = asset_cache.get_truncated_hash(original_summary_of_html)
         if recursive is True:
-            print("Cached from cache :D -> ", url)
+            sprint(f"Cached from cache :D -> {url}")
             return cached
         else:
-            print("Found site in cache")
+            # content = await session.get_file_content(cached)
+            sprint("Found site in cache")
             print(
                 f"To access this page, run the webserver using uvicorn, or docker, and then go to <webserver_socket>/media/{cached}"
             )
             return cached
-
     async with AppwriteSession() as session:
+
         for attributes, element in useful_elements:
             # an attempt to catch the mime type by html tag
             mimetype = findcorresponding_mimetype(element)
@@ -178,6 +183,12 @@ async def main(
                     new_url = urlparse(url)._replace(query="").geturl()
                     new_url = urljoin(new_url, value)
                     url_check = urlparse(new_url)
+                    if url_check.path == "/" and url_check.netloc != "":
+                        url_check = url_check._replace(path="")
+
+                if url_check.geturl() == url:  # Is literally just the same url..
+                    element.attrs[key] = f"."
+                    continue
                 try:
                     asset_response, optional_mimetype = (
                         await scraper.request_html_of_link(
@@ -192,16 +203,9 @@ async def main(
                     asset_cache.add_to_cache(
                         original_summary_of_html, "000000000000000000000000000000000000"
                     )
-                    if user == None:
-                        print(
-                            f"Error when trying to fetch (this element will therefore be skipped) {url_check}\t{e}"
-                        )
-                    else:
-                        job_task.add_status_message(
-                            f"Error when trying to fetch element, this element will be skipped. The url: {url_check} replied with {e.response.status_code}",
-                            StatusTypesEnum.ERROR,
-                        )
-                        db_session.commit()
+                    sprint(
+                        f"Error when trying to fetch (this element will therefore be skipped) {url_check.geturl()}\t{e}"
+                    )
                     continue
 
                 if optional_mimetype is not False:
@@ -209,9 +213,13 @@ async def main(
 
                 sha256_hash = hash_sha256_to_36(asset_response.content)
                 if mimetype.startswith("text/html"):
-
                     recursed_app_id: str = await main(
-                        url_check.geturl(), user, job_task, True, asset_cache
+                        url_check.geturl(),
+                        user,
+                        job_task,
+                        db_session,
+                        True,
+                        asset_cache,
                     )
                     element.attrs[key] = f"/media/{recursed_app_id}"
                     new_asset = AssetMetadata(
@@ -253,8 +261,6 @@ async def main(
         except Exception:
             ...
 
-        db_session.close()
-
         if recursive is True:
             return site_document_indentifier
 
@@ -295,9 +301,11 @@ if (
         )
         session.add(newjob)
         session.commit()
-        status_task = webserver.task_handler(-1, newjob.job_id, url)
+
+        status_task = webserver.task_handler(-1, newjob.job_id, url, session)
         session.refresh(newjob)
-        if status_task is False:  # Error
+
+        if status_task is False:  # There's an error!
             print("There were some errors while running the request, have a look")
             pprint(pickle.loads(newjob.status_messages), expand_all=True)
             exit(1)

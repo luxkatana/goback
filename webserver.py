@@ -125,31 +125,34 @@ async def job_status_route(job_id: int, user: user_annotated, db: db_annotated):
     return response
 
 
-def task_handler(user_id: int, job_id: int, url: str) -> bool:
-    with Session(db_engine) as db:
-        user = db.exec(select(User).where(User.user_id == user_id)).first()
-        is_ok = False
-        job = db.exec(select(JobTask).where(JobTask.job_id == job_id)).first()
-        try:
-            file_id = asyncio.run(scrape_site(url, user, job))
-        except HTTPStatusError as e:
-            if e.request.url == url:
-                job.add_status_message(
-                    f"requested URL host sent error code {e.response.status_code}",
-                    StatusTypesEnum.ERROR,
-                )
-            else:
-                job.add_status_message(
-                    f"Asset of requested URL has sent error code {e.response.status_code}",
-                    StatusTypesEnum.ERROR,
-                )
-        except Exception as e:
-            job.add_status_message(str(e), StatusTypesEnum.ERROR)
+def task_handler(user_id: int, job_id: int, url: str, db: Session) -> bool:
+    user = db.exec(select(User).where(User.user_id == user_id)).first()
+    is_ok = False
+    job = db.exec(select(JobTask).where(JobTask.job_id == job_id)).first()
+    try:
+        file_id = asyncio.run(scrape_site(url, user, job, db))
+    except HTTPStatusError as e:
+        if e.request.url == url:
+            job.add_status_message(
+                f"requested URL host sent error code {e.response.status_code}",
+                StatusTypesEnum.ERROR,
+            )
         else:
-            job.add_status_message(file_id, StatusTypesEnum.SUCCESS)
-            is_ok = True
-        db.commit()
-        return is_ok
+            job.add_status_message(
+                f"Asset of requested URL has sent error code {e.response.status_code}",
+                StatusTypesEnum.ERROR,
+            )
+    except Exception as e:
+        job.add_status_message(str(e), StatusTypesEnum.ERROR)
+    else:
+        job.add_status_message(file_id, StatusTypesEnum.SUCCESS)
+        is_ok = True
+
+    db.commit()
+    if user_id != -1:
+        db.close()
+    return is_ok
+
 
 class ScrapeUrlPayload(BaseModel):
     url: HttpUrl = Field(max_length=100)
@@ -158,7 +161,6 @@ class ScrapeUrlPayload(BaseModel):
 @app.post("/api/scrape", status_code=status.HTTP_202_ACCEPTED)
 async def scrape_site_route(
     db: db_annotated, user: user_annotated, url_payload: ScrapeUrlPayload
-
 ):
     new_job = JobTask(
         user_id=user.user_id,
@@ -171,7 +173,7 @@ async def scrape_site_route(
     db.commit()
 
     Thread(
-        target=task_handler, args=(user.user_id, new_job.job_id, str(url_payload.url))
+        target=task_handler, args=(user.user_id, new_job.job_id, str(url_payload.url), Session(db_engine))
     ).start()
     return {"job_id": new_job.job_id}
 
