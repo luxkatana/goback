@@ -26,7 +26,18 @@ class StatusTypesEnum(Enum):
     INFO = 1
     ERROR = 2
     FAILED = 3
-
+    def __repr__(self) -> str:
+        return self.__str__()
+    def __str__(self) -> str:
+        match self.value:
+            case 0:
+                return "Status-Success"
+            case 1:
+                return "Status-Info"
+            case 2:
+                return "Status-Error"
+            case 3:
+                return "Status-Failed"
 
 def get_db_session():
     try:
@@ -61,12 +72,6 @@ class AssetMetadata(SQLModel, table=True):
     mimetype: str = Field(default="any")
 
 
-class SitesMetadata(SQLModel, table=True):
-    __tablename__ = "goback_sites_metadata"
-    site_id: int | None = Field(primary_key=True)
-    user_id: int = Field(foreign_key="goback_users.user_id", default=-1)
-    site_url: str
-    document_file_id: str
 
 
 class Status(BaseModel):
