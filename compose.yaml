@@ -1,6 +1,6 @@
 services:
   goback:
-    image: luxkatana/goback:latest
+    build: .
     depends_on: 
       - db
     ports:
@@ -15,7 +15,7 @@ services:
   db:
     image: mysql
     environment:
-      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_RANDOM_ROOT_PASSWORD: yes
       MYSQL_DATABASE: goback
       MYSQL_USER: goback_usr
       MYSQL_PASSWORD: goback_usr1234

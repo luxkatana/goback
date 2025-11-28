@@ -86,7 +86,7 @@ def validate_appwrite_credentials(holder: ConfigurationHolder):
         if response.status_code == 401:
             if response.json()["type"] == "user_unauthorized":
                 print(
-                    "[red bold]ERROR[/red bold]: API key is invalid (api_key field in goback.toml)"
+                    "[red bold]ERROR[/red bold]: API key is invalid (api_key field in goback.toml or API_KEY in .env)"
                 )
             elif response.json()["type"] == "general_unauthorized_scope":
                 print(
